@@ -269,6 +269,7 @@
             cell.append(list);
         }
         if (category.input_mode === 'text' || category.input_mode === 'both') {
+            const textControl = element('div', 'dt-week-text-control');
             const label = element('label', 'dt-visually-hidden', `Freitext ${category.name} ${date}`);
             label.htmlFor = weekTextId(date, category.id);
             const textarea = element('textarea', 'dt-week-text');
@@ -279,7 +280,8 @@
             save.type = 'button';
             save.id = `dt-week-text-save-${date}-${selectedTimesliceId}-${category.id}`;
             save.addEventListener('click', () => saveCategoryValue(category, entry?.option_id ?? null, textarea.value, date));
-            cell.append(label, textarea, save);
+            textControl.append(label, textarea, save);
+            cell.append(textControl);
         }
         return cell;
     }

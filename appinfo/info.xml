@@ -20,7 +20,7 @@ Die App unterstützt:
 - CSV-Export
 - strikte Benutzertrennung
     ]]></description>
-    <version>3.0.0</version>
+    <version>3.0.2</version>
     <licence>AGPL-3.0-or-later</licence>
     <author>Sascha Rankers</author>
     <namespace>Daytracker</namespace>

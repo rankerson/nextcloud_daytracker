@@ -153,6 +153,24 @@
     margin-top: var(--dt-gap-md);
 }
 
+body:has(#dt-app) #content,
+body:has(#dt-app) #content-vue,
+body:has(#dt-app) #app-content {
+    min-height: 0;
+    overflow-y: auto !important;
+}
+
+body:has(#dt-app) #app-content-vue {
+    min-height: 100%;
+    overflow: visible;
+}
+
+#dt-app,
+#dt-app .dt-main,
+#dt-week-view {
+    max-height: none;
+}
+
 #dt-day-view[hidden],
 #dt-week-view[hidden] {
     display: none !important;
@@ -240,16 +258,48 @@
     padding: 7px 9px;
 }
 
-.dt-text-save,
-.dt-week-text-save {
+.dt-text-save {
     justify-self: start;
+}
+
+.dt-week-text-control {
+    position: relative;
+    z-index: 4;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--dt-gap-xs);
+    width: 100%;
+    min-width: 0;
+    margin-top: var(--dt-gap-xs);
+}
+
+.dt-week-text-control .dt-week-text {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+}
+
+.dt-week-text-control .dt-week-text-save {
+    position: static;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    justify-self: start;
+    width: auto;
+    min-height: 26px;
+    margin: 0;
+    padding: 3px 7px;
+    visibility: visible !important;
 }
 
 .dt-week-view {
     width: 100%;
     min-width: 0;
+    height: auto;
+    max-height: none;
     overflow-x: auto;
-    overflow-y: visible;
+    overflow-y: clip;
     padding-bottom: var(--dt-gap-xs);
 }
 
@@ -263,6 +313,7 @@
 
 .dt-week-table th,
 .dt-week-table td {
+    width: 150px;
     min-width: 122px;
     max-width: 180px;
     padding: 6px;
@@ -271,11 +322,18 @@
     border-bottom: var(--dt-border);
 }
 
+.dt-week-table td {
+    position: relative;
+    z-index: 1;
+    overflow: visible;
+}
+
 .dt-week-table th:first-child,
 .dt-week-table td:first-child {
     position: sticky;
     left: 0;
-    z-index: 2;
+    z-index: 3;
+    width: 140px;
     min-width: 140px;
     background: var(--dt-surface);
     border-left: var(--dt-border);
@@ -526,10 +584,20 @@
     overflow-wrap: anywhere;
 }
 
+.dt-dashboard-options {
+    flex-wrap: nowrap;
+    gap: 2px;
+    overflow: hidden;
+}
+
 .dt-dashboard-option {
-    min-height: 28px !important;
-    padding: 3px 7px !important;
-    font-size: 14px !important;
+    flex: 0 1 auto;
+    min-width: 20px;
+    min-height: 24px !important;
+    padding: 2px 4px !important;
+    font-size: 11px !important;
+    line-height: 1.1;
+    white-space: nowrap;
 }
 
 .dt-dashboard-footer {
