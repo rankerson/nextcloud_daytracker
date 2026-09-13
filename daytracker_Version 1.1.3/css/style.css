@@ -1,0 +1,516 @@
+#dt-app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px;
+    color: var(--color-main-text);
+}
+
+.dt-app * {
+    box-sizing: border-box;
+}
+
+.dt-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.dt-header-title h1 {
+    margin: 0;
+    font-size: 26px;
+    line-height: 1.2;
+}
+
+.dt-header-title p {
+    margin: 4px 0 0;
+    color: var(--color-text-maxcontrast);
+    font-size: 13px;
+}
+
+.dt-header-actions,
+.dt-datebar,
+.dt-options,
+.dt-modal-actions,
+.dt-dashboard-options {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.dt-datebar {
+    width: fit-content;
+    max-width: 100%;
+    padding: 6px;
+    margin-bottom: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+}
+
+.dt-date-input,
+.dt-admin-category-name,
+.dt-admin-limit,
+.dt-admin-option-input {
+    border: 1px solid var(--color-border-dark);
+    border-radius: 9px;
+    background: var(--color-main-background);
+    color: var(--color-main-text);
+}
+
+.dt-date-input {
+    min-height: 32px;
+    padding: 4px 8px;
+}
+
+.dt-state {
+    min-height: 25px;
+    margin: 3px 0 10px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: var(--color-background-hover);
+    color: var(--color-text-maxcontrast);
+    font-size: 12px;
+}
+
+.dt-state-saving {
+    color: var(--color-warning-text);
+    background: var(--color-warning-hover);
+}
+
+.dt-state-saved {
+    color: var(--color-success-text);
+    background: var(--color-success-hover);
+}
+
+.dt-state-error {
+    color: var(--color-error-text);
+    background: var(--color-error-hover);
+}
+
+.dt-category-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px;
+}
+
+.dt-category-card,
+.dt-week-cell,
+.dt-dashboard-category {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-main-background);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+}
+
+.dt-category-card-header,
+.dt-dashboard-category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 7px;
+    min-width: 0;
+    margin-bottom: 7px;
+}
+
+.dt-category-card-title,
+.dt-dashboard-category h3 {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 700;
+}
+
+.dt-category-card-title {
+    font-size: 15px;
+}
+
+.dt-dashboard-category h3 {
+    font-size: 13px;
+}
+
+.dt-category-status,
+.dt-dashboard-status {
+    flex: 0 0 auto;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--color-background-hover);
+    color: var(--color-text-maxcontrast);
+    font-size: 11px;
+    line-height: 1.3;
+}
+
+.dt-category-status-set,
+.dt-dashboard-status-set {
+    background: var(--color-primary-light);
+    color: var(--color-primary-text);
+}
+
+.dt-options,
+.dt-dashboard-options {
+    min-width: 0;
+    align-items: stretch;
+}
+
+.dt-button,
+.dt-option-button {
+    min-height: 30px;
+    max-width: 100%;
+    padding: 4px 9px;
+    border: 1px solid var(--color-border-dark);
+    border-radius: 999px;
+    background: var(--color-main-background);
+    color: var(--color-main-text);
+    font-size: 13px;
+    line-height: 1.25;
+    text-decoration: none;
+    cursor: pointer;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.dt-button:hover,
+.dt-option-button:hover {
+    background: var(--color-background-hover);
+}
+
+.dt-button-primary {
+    border-color: var(--color-primary-element) !important;
+    background-color: var(--color-primary-element) !important;
+    color: var(--color-primary-element-text) !important;
+}
+
+#dt-app .dt-option-button.dt-option-active,
+.dt-dashboard-widget .dt-option-button.dt-option-active {
+    border-color: var(--color-primary-element) !important;
+    background-color: var(--color-primary-element) !important;
+    color: var(--color-primary-element-text) !important;
+    box-shadow: inset 0 0 0 1px var(--color-primary-element), 0 1px 4px rgba(0, 0, 0, 0.16) !important;
+    font-weight: 700;
+}
+
+#dt-app .dt-option-button.dt-option-active:hover,
+.dt-dashboard-widget .dt-option-button.dt-option-active:hover {
+    border-color: var(--color-primary-element-hover) !important;
+    background-color: var(--color-primary-element-hover) !important;
+    color: var(--color-primary-element-text) !important;
+}
+
+.dt-button-icon {
+    min-width: 32px;
+    padding: 2px 7px;
+    font-size: 19px;
+}
+
+.dt-button-plain {
+    border-color: transparent;
+    background: transparent;
+    font-size: 22px;
+}
+
+.dt-button-small {
+    min-width: 29px;
+    min-height: 28px;
+    padding: 2px 7px;
+}
+
+.dt-week-view {
+    width: 100%;
+    overflow: auto;
+}
+
+.dt-week-grid {
+    display: grid;
+    grid-template-columns: minmax(125px, 170px) repeat(7, minmax(145px, 1fr));
+    gap: 5px;
+    min-width: 1180px;
+}
+
+.dt-week-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 7px;
+    border-radius: 8px;
+    background: var(--color-background-dark);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.dt-week-category {
+    padding: 8px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.dt-week-cell {
+    padding: 7px;
+}
+
+.dt-week-cell .dt-options {
+    gap: 4px;
+}
+
+.dt-week-cell .dt-option-button {
+    min-height: 27px;
+    padding: 3px 7px;
+    font-size: 11px;
+}
+
+.dt-modal[hidden],
+#dt-week-view[hidden],
+#dt-category-list[hidden] {
+    display: none !important;
+}
+
+.dt-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.dt-modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.dt-modal-panel {
+    position: relative;
+    z-index: 1;
+    width: min(920px, 100%);
+    max-height: calc(100vh - 40px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 16px;
+    background: var(--color-main-background);
+}
+
+.dt-modal-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px 17px 10px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.dt-modal-header h2 {
+    margin: 0;
+}
+
+.dt-admin-content {
+    overflow: auto;
+    padding: 13px 17px;
+}
+
+.dt-admin-category {
+    padding: 11px;
+    margin-bottom: 9px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-background-hover);
+}
+
+.dt-admin-heading,
+.dt-admin-options-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.dt-admin-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dt-admin-row {
+    display: grid;
+    grid-template-columns: 1fr 140px;
+    gap: 10px;
+    margin-bottom: 11px;
+}
+
+.dt-admin-category label {
+    display: block;
+    margin: 0 0 5px;
+    font-weight: 700;
+}
+
+.dt-admin-category-name,
+.dt-admin-limit,
+.dt-admin-option-input {
+    width: 100%;
+    min-height: 33px;
+    padding: 5px 8px;
+}
+
+.dt-admin-option-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.dt-admin-option-row {
+    display: grid;
+    grid-template-columns: 62px minmax(160px, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+}
+
+.dt-id-badge {
+    display: inline-flex;
+    justify-content: center;
+    padding: 2px 5px;
+    border-radius: 999px;
+    background: var(--color-background-dark);
+    color: var(--color-text-maxcontrast);
+    font-family: monospace;
+    font-size: 11px;
+}
+
+.dt-modal-actions {
+    justify-content: flex-end;
+    padding: 11px 17px;
+    border-top: 1px solid var(--color-border);
+}
+
+.dt-dashboard-widget {
+    width: 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.dt-dashboard-datebar {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) 30px;
+    gap: 4px;
+}
+
+.dt-dashboard-datebar .dt-button-icon {
+    width: 30px;
+    min-width: 30px;
+    min-height: 29px;
+    padding: 1px 5px;
+}
+
+.dt-dashboard-datebar input[type="date"] {
+    width: 100%;
+    min-width: 0;
+    min-height: 29px;
+    padding: 3px 5px;
+    font-size: 12px;
+}
+
+.dt-dashboard-content {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.dt-dashboard-category {
+    width: 100%;
+    max-width: 100%;
+    padding: 7px;
+    border-radius: 10px;
+}
+
+.dt-dashboard-selected {
+    max-width: 100%;
+    margin: 4px 0;
+    color: var(--color-text-maxcontrast);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dt-dashboard-options {
+    width: 100%;
+    max-width: 100%;
+    gap: 4px;
+}
+
+.dt-dashboard-options .dt-option-button {
+    min-width: 0;
+    min-height: 27px;
+    padding: 3px 7px;
+    font-size: 11px;
+    flex: 0 1 auto;
+}
+
+.dt-dashboard-link {
+    font-size: 12px;
+}
+
+.dt-empty-state {
+    padding: 10px;
+    border: 1px dashed var(--color-border-dark);
+    border-radius: 10px;
+    color: var(--color-text-maxcontrast);
+    font-size: 12px;
+}
+
+.dt-visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+@media (max-width: 700px) {
+    #dt-app {
+        padding: 11px;
+    }
+
+    .dt-header {
+        flex-direction: column;
+    }
+
+    .dt-admin-row {
+        grid-template-columns: 1fr;
+    }
+
+    .dt-admin-option-row {
+        grid-template-columns: 55px 1fr;
+    }
+
+    .dt-admin-option-row .dt-admin-controls {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+    }
+
+    .dt-modal {
+        padding: 8px;
+    }
+
+    .dt-modal-actions .dt-button {
+        width: 100%;
+        text-align: center;
+    }
+}
