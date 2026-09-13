@@ -1,0 +1,241 @@
+/* Daytracker 2.0.5
+ * Korrigiert das Layout von 2.0.4 ohne die Scrollstanderhaltung im Admin-Dialog zu entfernen.
+ */
+
+/* App wieder über die normale Nextcloud-Seite scrollen lassen. */
+#dt-app {
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+}
+
+#dt-view-scroll,
+.dt-view-scroll {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 0 12px !important;
+    overflow: visible !important;
+    scrollbar-gutter: auto !important;
+}
+
+/* Tagesansicht nutzt wieder die gesamte verfügbare Seitenbreite. */
+#dt-category-list,
+.dt-category-list {
+    width: 100% !important;
+    max-width: none !important;
+    align-items: start !important;
+}
+
+/* Karten erhalten wieder einen eindeutig deckenden Hintergrund. */
+#dt-app .dt-category-card,
+#dt-app .dt-week-cell,
+.dt-dashboard-widget .dt-dashboard-category {
+    background-color: var(--color-main-background) !important;
+    opacity: 1 !important;
+    isolation: isolate;
+}
+
+#dt-app .dt-category-card,
+#dt-app .dt-week-cell {
+    border-color: var(--color-border) !important;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Nur die breite Wochenmatrix darf horizontal scrollen. Die Seite selbst scrollt vertikal. */
+#dt-week-view,
+.dt-week-view {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 0 8px !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+}
+
+.dt-week-view::-webkit-scrollbar {
+    height: 7px;
+}
+
+.dt-week-view::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: var(--color-border-maxcontrast);
+}
+
+.dt-week-view::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* Admin-Inhalt bleibt scrollbar. Die Scrollposition wird weiterhin durch ui-runtime-fix.js erhalten. */
+.dt-modal-panel {
+    min-height: 0 !important;
+}
+
+.dt-admin-content {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scroll-behavior: auto;
+    overflow-anchor: none;
+    background-color: var(--color-main-background) !important;
+}
+
+.dt-admin-section {
+    overflow-anchor: none;
+}
+
+/* Dashboard: gleiche Schriftgröße wie die Statuszeile, aber deutlich weniger Innenabstand. */
+.dt-dashboard-widget {
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 3px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+.dt-dashboard-widget .dt-state {
+    margin: 2px 0 !important;
+    padding: 2px 4px !important;
+    min-height: 20px !important;
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 3px !important;
+    padding: 0 !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-category {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    padding: 2px 3px !important;
+    border-radius: 7px !important;
+    background-color: var(--color-main-background) !important;
+    overflow: hidden !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-category .dt-card-head {
+    min-width: 0 !important;
+    margin: 0 0 2px !important;
+    gap: 3px !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-category h3,
+.dt-dashboard-widget .dt-dashboard-selected,
+.dt-dashboard-widget .dt-dashboard-category .dt-status,
+.dt-dashboard-widget .dt-dashboard-category .dt-dashboard-status,
+.dt-dashboard-widget .dt-dashboard-options .dt-option-button,
+.dt-dashboard-widget button.dt-option-button {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-category h3 {
+    min-width: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-category .dt-status,
+.dt-dashboard-widget .dt-dashboard-category .dt-dashboard-status {
+    flex: 0 0 auto !important;
+    padding: 1px 4px !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-selected {
+    margin: 1px 0 2px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-options {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    gap: 2px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-options .dt-option-button,
+.dt-dashboard-widget button.dt-option-button {
+    flex: 0 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 22px !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 2px 5px !important;
+    border-width: 1px !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    text-align: center !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-options .dt-option-button.dt-option-active,
+.dt-dashboard-widget button.dt-option-button.dt-option-active {
+    border-color: var(--color-primary-element) !important;
+    background-color: var(--color-primary-element) !important;
+    color: var(--color-primary-element-text) !important;
+    box-shadow: inset 0 0 0 1px var(--color-primary-element) !important;
+    font-weight: 700 !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-controls {
+    gap: 2px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-controls input[type="date"],
+.dt-dashboard-widget .dt-dashboard-controls select {
+    min-height: 25px !important;
+    padding: 1px 4px !important;
+    font-size: 11px !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-controls .dt-button-icon {
+    min-width: 25px !important;
+    width: 25px !important;
+    min-height: 25px !important;
+    padding: 0 3px !important;
+    font-size: 15px !important;
+}
+
+.dt-dashboard-widget .dt-dashboard-link {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11px !important;
+}
+
+@media (max-width: 700px) {
+    #dt-app {
+        width: 100% !important;
+        padding-inline: 8px !important;
+    }
+}

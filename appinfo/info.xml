@@ -1,22 +1,19 @@
 <?xml version="1.0"?>
-<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
     <id>daytracker</id>
     <name>Daytracker</name>
-    <summary>Persönlicher Tages-Tracker für Kategorien und Optionen</summary>
-    <description>Daytracker speichert pro Benutzer, Kalendertag und Kategorie genau eine Option.</description>
-    <version>1.1.3</version>
+    <summary>Persönlicher Tages-Tracker für Kategorien, Zeitscheiben und Freitext</summary>
+    <description>Daytracker speichert pro Benutzer, Kalendertag, Zeitscheibe und Kategorie einen Wert.</description>
+    <version>2.0.5</version>
     <licence>agpl</licence>
     <author>Sascha Rankers</author>
     <namespace>Daytracker</namespace>
     <category>organization</category>
     <category>tools</category>
-
     <dependencies>
         <php min-version="8.1"/>
         <nextcloud min-version="33" max-version="33"/>
     </dependencies>
-
     <navigations>
         <navigation>
             <id>daytracker</id>
