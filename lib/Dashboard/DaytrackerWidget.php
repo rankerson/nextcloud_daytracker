@@ -4,26 +4,22 @@ declare(strict_types=1);
 
 namespace OCA\Daytracker\Dashboard;
 
-use OCA\Daytracker\AppInfo\Application;
 use OCP\Dashboard\IWidget;
 use OCP\IL10N;
 use OCP\IURLGenerator;
 use OCP\Util;
 
-class DaytrackerWidget implements IWidget
+final class DaytrackerWidget implements IWidget
 {
-    private IL10N $l10n;
-    private IURLGenerator $urlGenerator;
-
-    public function __construct(IL10N $l10n, IURLGenerator $urlGenerator)
-    {
-        $this->l10n = $l10n;
-        $this->urlGenerator = $urlGenerator;
+    public function __construct(
+        private readonly IL10N $l10n,
+        private readonly IURLGenerator $urlGenerator,
+    ) {
     }
 
     public function getId(): string
     {
-        return Application::APP_ID;
+        return 'daytracker';
     }
 
     public function getTitle(): string
@@ -48,7 +44,7 @@ class DaytrackerWidget implements IWidget
 
     public function load(): void
     {
-        Util::addStyle(Application::APP_ID, 'style');
-        Util::addScript(Application::APP_ID, 'dashboard');
+        Util::addStyle('daytracker', 'style');
+        Util::addScript('daytracker', 'dashboard');
     }
 }

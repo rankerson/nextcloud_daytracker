@@ -10,7 +10,7 @@ return [
             'verb' => 'GET',
         ],
         [
-            'name' => 'page#getCatalog',
+            'name' => 'page#catalog',
             'url' => '/api/catalog',
             'verb' => 'GET',
         ],
@@ -20,14 +20,20 @@ return [
             'verb' => 'POST',
         ],
         [
-            'name' => 'page#getDay',
+            'name' => 'page#day',
             'url' => '/api/day/{date}',
             'verb' => 'GET',
+            'requirements' => [
+                'date' => '\\d{4}-\\d{2}-\\d{2}',
+            ],
         ],
         [
             'name' => 'page#saveDay',
             'url' => '/api/day/{date}',
             'verb' => 'POST',
+            'requirements' => [
+                'date' => '\\d{4}-\\d{2}-\\d{2}',
+            ],
         ],
         [
             'name' => 'page#exportCsv',

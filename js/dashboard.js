@@ -1,1 +1,306 @@
-(function(){'use strict';const u=p=>window.OC&&OC.generateUrl?OC.generateUrl('/apps/daytracker'+p):'/index.php/apps/daytracker'+p,t=()=>window.OC&&typeof OC.requestToken==='string'?OC.requestToken:'';function ds(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}function n(a,c='',x){const e=document.createElement(a);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}function clear(e){while(e.firstChild)e.removeChild(e.firstChild)}async function get(p){const r=await fetch(u(p),{credentials:'same-origin',headers:{Accept:'application/json'}});if(!r.ok)throw Error('GET '+p+' HTTP '+r.status);return r.json()}async function post(p,d){const r=await fetch(u(p),{method:'POST',credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/json',requesttoken:t()},body:JSON.stringify(d)});if(!r.ok)throw Error('POST '+p+' HTTP '+r.status);return r.json()}function init(root){let cats=[],slices=[],date=ds(),slice='',entries={},content,status,select;const key=(s,c)=>s+':'+c;async function load(){const [c,d]=await Promise.all([get('/api/catalog'),get('/api/day/'+date)]);cats=c.categories||[];slices=c.timeslices||[];if(!slice&&slices.length)slice=String(slices[0].id);entries={};(d.entries||[]).forEach(x=>entries[key(x.timeslice_id,x.category_id)]=x)}function statusText(x){status.textContent=x}function render(){clear(content);clear(select);slices.forEach(s=>{const o=n('option','',s.name);o.value=String(s.id);o.selected=o.value===slice;select.appendChild(o)});cats.forEach(c=>{const x=entries[key(slice,c.id)],box=n('section','dt-dashboard-category'),h=n('div','dt-card-head');h.append(n('h3','',c.name),n('span','dt-status'+(x?' dt-status-set':''),x?'gepflegt':'offen'));box.appendChild(h);if(x){const selected=(c.options||[]).find(o=>String(o.id)===String(x.option_id)),parts=[];if(selected)parts.push(selected.label);if(x.text_value)parts.push(x.text_value);box.appendChild(n('div','dt-dashboard-selected','Ausgewählt: '+parts.join(' | ')))}const opts=n('div','dt-options');(c.options||[]).slice(0,Number(c.dashboard_limit??2)).forEach(o=>{const active=x&&String(x.option_id)===String(o.id),b=n('button','dt-option-button'+(active?' dt-option-active':''),o.label);b.type='button';b.addEventListener('click',async()=>{try{statusText('Speichere ...');const r=await post('/api/day/'+date,{timeslice_id:Number(slice),category_id:Number(c.id),option_id:Number(o.id),text_value:x?x.text_value||'':''});entries[key(slice,c.id)]=r.entry;render();statusText('Gespeichert')}catch(err){console.error(err);statusText('Fehler beim Speichern')}});opts.appendChild(b)});box.appendChild(opts);content.appendChild(box)})}async function reload(){try{statusText('Lade ...');await load();render();statusText('Bereit')}catch(err){console.error(err);statusText('Fehler beim Laden')}}clear(root);root.classList.add('dt-dashboard-widget');const controls=n('div','dt-dashboard-controls'),prev=n('button','dt-button dt-button-icon','‹'),input=n('input','dt-date-input'),next=n('button','dt-button dt-button-icon','›');input.type='date';input.value=date;input.name='daytracker-dashboard-date';select=n('select','dt-select');select.name='daytracker-dashboard-timeslice';function move(days){const p=date.split('-').map(Number),d=new Date(p[0],p[1]-1,p[2]);d.setDate(d.getDate()+days);date=ds(d);input.value=date;reload()}prev.addEventListener('click',()=>move(-1));next.addEventListener('click',()=>move(1));input.addEventListener('change',()=>{date=input.value;reload()});select.addEventListener('change',()=>{slice=select.value;render()});controls.append(prev,input,next,select);status=n('div','dt-state','Bereit');content=n('div','dt-dashboard-content');const link=n('a','dt-dashboard-link','Daytracker öffnen');link.href=u('/');root.append(controls,status,content,link);reload()}function reg(){if(window.OCA&&OCA.Dashboard&&typeof OCA.Dashboard.register==='function')OCA.Dashboard.register('daytracker',init);else document.querySelectorAll('[data-daytracker-dashboard],.dt-dashboard-widget').forEach(init)}document.readyState==='loading'?document.addEventListener('DOMContentLoaded',reg):reg();}());
+(() => {
+    'use strict';
+
+    let catalog = { categories: [], timeslices: [] };
+    let timeslices = [];
+    let selectedDate = localDateString(new Date());
+    let selectedTimesliceId = null;
+    let entries = [];
+    let selectedByCategory = new Map();
+    let root = null;
+    let state = null;
+    let categoryContainer = null;
+    let dashboardRegistered = false;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', registerDashboardWidget, { once: true });
+    } else {
+        registerDashboardWidget();
+    }
+
+    function registerDashboardWidget() {
+        if (dashboardRegistered) return;
+        if (!window.OCA || !OCA.Dashboard || typeof OCA.Dashboard.register !== 'function') {
+            console.error('Daytracker-Dashboard konnte nicht registriert werden: OCA.Dashboard.register ist nicht verfügbar.');
+            return;
+        }
+
+        dashboardRegistered = true;
+        OCA.Dashboard.register('daytracker', (widgetElement) => {
+            initializeDashboard(widgetElement).catch((error) => {
+                console.error('Daytracker-Dashboard konnte nicht initialisiert werden:', error);
+            });
+        });
+    }
+
+    async function initializeDashboard(widgetElement) {
+        if (!(widgetElement instanceof HTMLElement)) {
+            console.error('Daytracker-Dashboard wurde ohne gültiges Widget-Element aufgerufen.');
+            return;
+        }
+
+        root = widgetElement;
+        root.id = 'dt-dashboard';
+        root.classList.add('dt-dashboard');
+        buildStructure();
+        bindEvents();
+        await loadAll();
+    }
+
+    function buildStructure() {
+        root.replaceChildren();
+
+        const toolbar = element('div', 'dt-dashboard-toolbar');
+        const previous = button('dt-dashboard-date-prev', '‹', 'Vorheriger Tag');
+        const dateLabel = element('label', 'dt-visually-hidden', 'Datum');
+        dateLabel.id = 'dt-dashboard-date-label';
+        dateLabel.htmlFor = 'dt-dashboard-date';
+
+        const dateInput = document.createElement('input');
+        dateInput.id = 'dt-dashboard-date';
+        dateInput.name = 'dt-dashboard-date';
+        dateInput.type = 'date';
+        dateInput.value = selectedDate;
+
+        const next = button('dt-dashboard-date-next', '›', 'Nächster Tag');
+        const sliceLabel = element('label', 'dt-visually-hidden', 'Zeitscheibe');
+        sliceLabel.id = 'dt-dashboard-timeslice-label';
+        sliceLabel.htmlFor = 'dt-dashboard-timeslice';
+
+        const slice = document.createElement('select');
+        slice.id = 'dt-dashboard-timeslice';
+        slice.name = 'dt-dashboard-timeslice';
+        state = element('div', 'dt-dashboard-state', 'Lade ...');
+        state.id = 'dt-dashboard-state';
+        state.setAttribute('role', 'status');
+        state.setAttribute('aria-live', 'polite');
+        toolbar.append(previous, dateLabel, dateInput, next, sliceLabel, slice, state);
+
+        categoryContainer = element('div', 'dt-dashboard-categories');
+        categoryContainer.id = 'dt-dashboard-categories';
+
+        const footer = element('div', 'dt-dashboard-footer');
+        const link = element('a', '', 'Vollständige App öffnen');
+        link.id = 'dt-dashboard-app-link';
+        link.href = generateUrl('/apps/daytracker/');
+        footer.append(link);
+        root.append(toolbar, categoryContainer, footer);
+    }
+
+    function bindEvents() {
+        document.getElementById('dt-dashboard-date-prev').addEventListener('click', () => shiftDate(-1));
+        document.getElementById('dt-dashboard-date-next').addEventListener('click', () => shiftDate(1));
+        document.getElementById('dt-dashboard-date').addEventListener('change', async (event) => {
+            if (isDateString(event.target.value)) {
+                selectedDate = event.target.value;
+                await loadEntries();
+                renderCategories();
+            }
+        });
+        document.getElementById('dt-dashboard-timeslice').addEventListener('change', (event) => {
+            selectedTimesliceId = Number(event.target.value);
+            rebuildSelection();
+            renderCategories();
+        });
+    }
+
+    async function loadAll() {
+        setState('Lade ...');
+        try {
+            const response = await fetchJson(generateUrl('/apps/daytracker/api/catalog'));
+            catalog = response;
+            timeslices = response.timeslices || [];
+            selectedTimesliceId = timeslices.length ? Number(timeslices[0].id) : null;
+            renderTimeslices();
+            await loadEntries();
+            renderCategories();
+            setState('Bereit');
+        } catch (error) {
+            console.error('Daytracker-Dashboard:', error);
+            setState('Fehler beim Laden', 'error');
+        }
+    }
+
+    async function loadEntries() {
+        const response = await fetchJson(generateUrl(`/apps/daytracker/api/day/${selectedDate}`));
+        entries = response.entries || [];
+        rebuildSelection();
+    }
+
+    function rebuildSelection() {
+        selectedByCategory = new Map();
+        for (const entry of entries) {
+            if (Number(entry.timeslice_id) === selectedTimesliceId) {
+                selectedByCategory.set(Number(entry.category_id), entry);
+            }
+        }
+    }
+
+    function renderTimeslices() {
+        const select = document.getElementById('dt-dashboard-timeslice');
+        select.replaceChildren(...timeslices.map((item) => {
+            const option = document.createElement('option');
+            option.value = String(item.id);
+            option.textContent = item.name;
+            option.selected = Number(item.id) === selectedTimesliceId;
+            return option;
+        }));
+        select.disabled = timeslices.length === 0;
+    }
+
+    function renderCategories() {
+        categoryContainer.replaceChildren(...(catalog.categories || []).filter((category) => category.dashboard_enabled !== false).map(createCategory));
+    }
+
+    function createCategory(category) {
+        const entry = selectedByCategory.get(Number(category.id));
+        const selectedOption = (category.options || []).find((option) => Number(option.id) === Number(entry?.option_id));
+        const selectedParts = [];
+        if (selectedOption) selectedParts.push(selectedOption.label);
+        if (String(entry?.text_value || '').trim()) selectedParts.push(entry.text_value.trim());
+
+        const statusText = isSet(entry) ? 'gepflegt' : 'offen';
+        const valueAndStatus = selectedParts.length > 0
+            ? `${selectedParts.join(' · ')} | ${statusText}`
+            : statusText;
+
+        const card = element('section', 'dt-dashboard-category');
+        const header = element('div', 'dt-dashboard-category-header');
+        header.append(
+            element('h3', 'dt-dashboard-category-title', category.name),
+            element('span', `dt-dashboard-indicator${isSet(entry) ? ' dt-set' : ''}`, valueAndStatus)
+        );
+        card.append(header);
+
+        const visibleOptions = (category.options || []).slice(0, Math.max(0, Number(category.dashboard_limit) || 0));
+        if ((category.input_mode === 'options' || category.input_mode === 'both') && visibleOptions.length) {
+            const options = element('div', 'dt-dashboard-options');
+            for (const option of visibleOptions) {
+                const control = button('', option.label, `${category.name}: ${option.label}`);
+                control.className = 'button dt-dashboard-option';
+                control.setAttribute('aria-pressed', String(Number(entry?.option_id) === Number(option.id)));
+                control.addEventListener('click', () => save(category, option.id, entry?.text_value || ''));
+                options.append(control);
+            }
+            card.append(options);
+        }
+        return card;
+    }
+
+    async function save(category, optionId, textValue) {
+        setState('Speichere ...');
+        try {
+            const response = await postJson(generateUrl(`/apps/daytracker/api/day/${selectedDate}`), {
+                category_id: Number(category.id),
+                timeslice_id: Number(selectedTimesliceId),
+                option_id: Number(optionId),
+                text_value: textValue
+            });
+            const replacement = response.entry;
+            entries = entries.filter((entry) => !(
+                Number(entry.category_id) === Number(category.id)
+                && Number(entry.timeslice_id) === selectedTimesliceId
+            ));
+            entries.push(replacement);
+            rebuildSelection();
+            renderCategories();
+            setState('Gespeichert', 'success');
+        } catch (error) {
+            console.error('Daytracker-Dashboard-Speicherfehler:', error);
+            setState('Fehler beim Speichern', 'error');
+        }
+    }
+
+    async function shiftDate(days) {
+        const date = parseLocalDate(selectedDate);
+        date.setDate(date.getDate() + days);
+        selectedDate = localDateString(date);
+        document.getElementById('dt-dashboard-date').value = selectedDate;
+        setState('Lade ...');
+        try {
+            await loadEntries();
+            renderCategories();
+            setState('Bereit');
+        } catch (error) {
+            console.error('Daytracker-Dashboard-Ladefehler:', error);
+            setState('Fehler beim Laden', 'error');
+        }
+    }
+
+    async function fetchJson(url) {
+        const response = await fetch(url, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' }
+        });
+        return parseResponse(response);
+    }
+
+    async function postJson(url, payload) {
+        const response = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                requesttoken: OC.requestToken
+            },
+            body: JSON.stringify(payload)
+        });
+        return parseResponse(response);
+    }
+
+    async function parseResponse(response) {
+        let payload;
+        try {
+            payload = await response.json();
+        } catch (error) {
+            throw new Error(`Ungültige Serverantwort (${response.status}).`);
+        }
+        if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+        return payload;
+    }
+
+    function setState(message, kind = '') {
+        state.textContent = message;
+        state.classList.toggle('dt-error', kind === 'error');
+        state.classList.toggle('dt-success', kind === 'success');
+    }
+
+    function isSet(entry) {
+        return Boolean(entry && (entry.option_id !== null || String(entry.text_value || '').trim()));
+    }
+
+    function generateUrl(path) {
+        return window.OC?.generateUrl ? OC.generateUrl(path) : `/index.php${path}`;
+    }
+
+    function element(tag, className = '', text = '') {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text) node.textContent = text;
+        return node;
+    }
+
+    function button(id, text, label) {
+        const node = element('button', 'button dt-icon-button', text);
+        node.type = 'button';
+        if (id) node.id = id;
+        node.setAttribute('aria-label', label);
+        node.title = label;
+        return node;
+    }
+
+    function parseLocalDate(value) {
+        const [year, month, day] = value.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    }
+
+    function localDateString(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function isDateString(value) {
+        const date = parseLocalDate(value);
+        return !Number.isNaN(date.getTime()) && localDateString(date) === value;
+    }
+})();

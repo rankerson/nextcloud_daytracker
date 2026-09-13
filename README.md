@@ -1,249 +1,148 @@
-# Daytracker
+# Daytracker für Nextcloud 33
 
-Daytracker ist eine native Nextcloud-App für Nextcloud 33. Sie speichert pro angemeldetem Benutzer, Kalendertag und Kategorie genau eine Option, zum Beispiel Arbeitsort oder Aufenthaltsort.
+Daytracker ist eine native Nextcloud-App zur benutzerbezogenen Erfassung von Tageswerten nach Kategorien und Zeitscheiben.
 
 ## Zielumgebung
 
 - Nextcloud 33
 - Nextcloud AIO
+- PHP 8.1 oder höher
 - PostgreSQL
-- PHP 8.1+
-- App-ID: `daytracker`
-- Namespace: `OCA\Daytracker`
-- App-Verzeichnis: `/var/www/html/custom_apps/daytracker`
-- Nextcloud-Container: `nextcloud-aio-nextcloud`
-- Kein npm-Build
-- Kein Vue
-- Kein TypeScript
-- Vanilla JavaScript
+- App-ID `daytracker`
+- Namespace `OCA\Daytracker`
+- Container `nextcloud-aio-nextcloud`
+- App-Pfad `/var/www/html/custom_apps/daytracker`
+- Vanilla JavaScript ohne Build-Prozess
 
 ## Funktionsumfang
 
-### Phase 1
+- Tagesansicht
+- Wochenansicht von Montag bis Sonntag
+- Kategorien mit Auswahl, Freitext oder beidem
+- frei konfigurierbare Zeitscheiben
+- transaktionale Administration
+- benutzerbezogene Datenhaltung
+- CSV-Export mit UTF-8-BOM und Semikolon
+- Nextcloud-Dashboard-Widget
+- CSRF-geschützte Schreibzugriffe
 
-- Native Nextcloud-App
-- Hauptansicht mit Datumsauswahl
-- Kategorien und Optionen als Buttons
-- Automatisches Speichern nach Klick
-- Hervorhebung gespeicherter Werte
-- Keine Default-Hervorhebung für neue Tage
-- Administration als div-basiertes Modal
-- Kategorien und Optionen pflegen
-- CSV-Export aus der Administration
-- Benutzerbezogene Daten
-- PostgreSQL-kompatibles Datenmodell
+## Bestehendes Datenmodell
 
-### Phase 2
-
-- Nextcloud Dashboard Widget
-- Datumsauswahl im Widget
-- Schnellauswahl der ersten zwei Optionen je Kategorie
-- Automatisches Speichern im Widget
-- Link zur vollständigen App
-
-## Datenmodell
-
-Die App verwendet folgende Tabellen. Nextcloud ergänzt automatisch den konfigurierten Tabellenpräfix, typischerweise `oc_`.
-
-### `daytracker_categories`
-
-| Feld | Typ | Bedeutung |
-| --- | --- | --- |
-| `id` | integer | Primärschlüssel |
-| `user_id` | string | Benutzer-ID |
-| `name` | string | Kategorie-Name |
-| `sort_order` | integer | Sortierung |
-
-### `daytracker_options`
-
-| Feld | Typ | Bedeutung |
-| --- | --- | --- |
-| `id` | integer | Primärschlüssel |
-| `category_id` | integer | Kategorie-ID |
-| `label` | string | Optionsbezeichnung |
-| `sort_order` | integer | Sortierung |
-
-### `daytracker_entries`
-
-| Feld | Typ | Bedeutung |
-| --- | --- | --- |
-| `id` | integer | Primärschlüssel |
-| `user_id` | string | Benutzer-ID |
-| `entry_date` | string | Datum im Format `YYYY-MM-DD` |
-| `category_id` | integer | Kategorie-ID |
-| `option_id` | integer | Option-ID |
-| `updated_at` | string | Änderungszeitpunkt im Format `YYYY-MM-DD HH:MM:SS` |
-
-Für Tageswerte existiert ein Unique Index auf:
+Die App verwendet ausschließlich die vorhandenen Tabellen:
 
 ```text
-user_id, entry_date, category_id
+daytracker_categories
+daytracker_options
+daytracker_entries
+daytracker_timeslices
 ```
 
-Damit kann pro Benutzer, Datum und Kategorie nur ein Eintrag existieren.
-
-## Standardkatalog
-
-Beim ersten Aufruf wird je Benutzer ein Standardkatalog selbstheilend angelegt.
-
-### Arbeitsort
-
-1. HomeOffice
-2. Geschäftsstelle
-3. Geschäftsreise mit RK
-4. Geschäftsreise ohne RK
-5. Urlaub
-6. Krankheit
-7. keine Arbeit
-
-### Aufenthaltsort
-
-1. Berlin
-2. Hamburg
-3. 50%/50%
-4. sonstiges
-
-Die Initialisierung prüft jede Kategorie und jede Option einzeln. Fehlende Daten werden ergänzt, vorhandene Daten werden nicht doppelt angelegt.
-
-## API-Routen
-
-| Methode | Route | Zweck | CSRF |
-| --- | --- | --- | --- |
-| GET | `/index.php/apps/daytracker/` | Hauptansicht | nicht erforderlich |
-| GET | `/index.php/apps/daytracker/api/catalog` | Katalog laden | nicht erforderlich |
-| POST | `/index.php/apps/daytracker/api/catalog` | Administration speichern | erforderlich |
-| GET | `/index.php/apps/daytracker/api/day/YYYY-MM-DD` | Tageswerte laden | nicht erforderlich |
-| POST | `/index.php/apps/daytracker/api/day/YYYY-MM-DD` | Tageswert speichern | erforderlich |
-| GET | `/index.php/apps/daytracker/export.csv` | CSV exportieren | nicht erforderlich |
-
-POST-Anfragen senden im JavaScript den Header:
+Bei einem Nextcloud-Tabellenpräfix `oc_` erscheinen diese in PostgreSQL als:
 
 ```text
-requesttoken: OC.requestToken
+oc_daytracker_categories
+oc_daytracker_options
+oc_daytracker_entries
+oc_daytracker_timeslices
 ```
 
-## CSV-Export
+Die vorhandenen Primärschlüssel und Fremdschlüsselbeziehungen bleiben erhalten. Kategorien, Optionen und Zeitscheiben werden über ihre technischen IDs referenziert. Sichtbare Namen und Labels sind keine Zuordnungsschlüssel.
 
-Der CSV-Export befindet sich ausschließlich im Administrationsmodal.
+Diese Version enthält keine neue Migration. Vorhandene historische Migrationen unter `appinfo/migrations/` müssen erhalten bleiben.
 
-Eigenschaften:
-
-- UTF-8 mit BOM
-- Semikolon als Separator
-- Dateiname: `daytracker-export.csv`
-- Nur Daten des angemeldeten Benutzers
-- Sortierung nach Datum und Kategorie
-
-Spalten:
+## Dateien der vollständigen Version
 
 ```text
-Datum;Kategorie;Option;letztes Änderungsdatum
+daytracker/
+├── appinfo/
+│   ├── info.xml
+│   ├── routes.php
+│   └── migrations/
+│       └── vorhandene historische Migrationen, unverändert
+├── css/
+│   └── style.css
+├── img/
+│   └── app.svg
+├── js/
+│   ├── dashboard.js
+│   └── main.js
+├── lib/
+│   ├── AppInfo/
+│   │   └── Application.php
+│   ├── Controller/
+│   │   └── PageController.php
+│   └── Dashboard/
+│       └── DaytrackerWidget.php
+├── templates/
+│   └── main.php
+└── README.md
 ```
 
-## Frontend-ID-Matrix
+## Installation und Upgrade
 
-### IDs in `templates/main.php`
+### 1. Sicherung erstellen
 
-```text
-dt-app
-dt-admin-open
-dt-date-prev
-dt-date
-dt-date-next
-dt-state
-dt-category-list
-dt-admin-modal
-dt-admin-overlay
-dt-admin-panel
-dt-admin-title
-dt-admin-close
-dt-admin-content
-dt-admin-add-category
-dt-csv-export
-dt-admin-save
-dt-admin-cancel
-```
-
-### IDs in `js/main.js`
-
-```text
-dt-app
-dt-admin-open
-dt-date-prev
-dt-date
-dt-date-next
-dt-state
-dt-category-list
-dt-admin-modal
-dt-admin-overlay
-dt-admin-panel
-dt-admin-close
-dt-admin-content
-dt-admin-add-category
-dt-csv-export
-dt-admin-save
-dt-admin-cancel
-```
-
-### Modal-Entscheidung
-
-Die App verwendet ein div-basiertes Modal.
-
-```text
-showModal(): nein
-.close(): nein
-<dialog>: nein
-```
-
-Das Modal wird geöffnet über:
-
-```javascript
-elements.adminModal.hidden = false;
-```
-
-Das Modal wird geschlossen über:
-
-```javascript
-elements.adminModal.hidden = true;
-```
-
-## Installation in Nextcloud AIO
-
-### 1. App-Ordner erstellen
+Vor dem Austausch der Dateien muss das produktive App-Verzeichnis gesichert werden:
 
 ```bash
-docker exec -u root nextcloud-aio-nextcloud mkdir -p /var/www/html/custom_apps/daytracker
+docker exec -u root nextcloud-aio-nextcloud bash -lc '
+set -e
+stamp=$(date +%Y%m%d-%H%M%S)
+cp -a /var/www/html/custom_apps/daytracker "/var/www/html/custom_apps/daytracker.backup-${stamp}"
+echo "Sicherung: /var/www/html/custom_apps/daytracker.backup-${stamp}"
+'
 ```
 
-### 2. Dateien kopieren
+Eine zusätzliche PostgreSQL-Sicherung entsprechend dem bestehenden AIO-Sicherungskonzept wird empfohlen, bevor produktive Dateien ersetzt werden.
 
-Kopiere den Inhalt des Ordners `daytracker/` aus allen ZIP-Paketen nach:
+### 2. Pakete zusammenführen
+
+Die ZIP-Archive enthalten jeweils den obersten Ordner `daytracker/`. Alle fünf Pakete müssen lokal in dasselbe Zielverzeichnis entpackt werden. Gleichnamige Dateien werden ersetzt.
+
+Die vorhandenen historischen Dateien unter `appinfo/migrations/` dürfen nicht gelöscht werden.
+
+Das zusammengeführte Verzeichnis wird anschließend nach folgendem Pfad kopiert:
 
 ```text
 /var/www/html/custom_apps/daytracker
 ```
 
-Die Zielstruktur muss danach so aussehen:
+Es dürfen keine alten Fix-Dateien aktiv bleiben. Insbesondere sind folgende früher möglicherweise verwendete Dateien zu entfernen, falls sie noch existieren:
 
 ```text
-/var/www/html/custom_apps/daytracker/appinfo/info.xml
-/var/www/html/custom_apps/daytracker/appinfo/routes.php
-/var/www/html/custom_apps/daytracker/lib/AppInfo/Application.php
-/var/www/html/custom_apps/daytracker/lib/Migration/Version1000Date20260817233000.php
-/var/www/html/custom_apps/daytracker/lib/Controller/PageController.php
-/var/www/html/custom_apps/daytracker/lib/Dashboard/DaytrackerWidget.php
-/var/www/html/custom_apps/daytracker/templates/main.php
-/var/www/html/custom_apps/daytracker/js/main.js
-/var/www/html/custom_apps/daytracker/js/dashboard.js
-/var/www/html/custom_apps/daytracker/css/style.css
-/var/www/html/custom_apps/daytracker/img/app.svg
-/var/www/html/custom_apps/daytracker/README.md
+css/ui-runtime-fix.css
+css/dashboard-button-fix.css
+css/dashboard.css
+js/ui-runtime-fix.js
+js/dashboard-button-fix.js
+```
+
+Entfernen im Container:
+
+```bash
+docker exec -u root nextcloud-aio-nextcloud bash -lc '
+rm -f \
+  /var/www/html/custom_apps/daytracker/css/ui-runtime-fix.css \
+  /var/www/html/custom_apps/daytracker/css/dashboard-button-fix.css \
+  /var/www/html/custom_apps/daytracker/css/dashboard.css \
+  /var/www/html/custom_apps/daytracker/js/ui-runtime-fix.js \
+  /var/www/html/custom_apps/daytracker/js/dashboard-button-fix.js
+'
 ```
 
 ### 3. Rechte setzen
 
 ```bash
 docker exec -u root nextcloud-aio-nextcloud chown -R www-data:www-data /var/www/html/custom_apps/daytracker
+```
+
+Optional können die Verzeichnis- und Dateirechte normalisiert werden:
+
+```bash
+docker exec -u root nextcloud-aio-nextcloud bash -lc '
+find /var/www/html/custom_apps/daytracker -type d -exec chmod 750 {} \;
+find /var/www/html/custom_apps/daytracker -type f -exec chmod 640 {} \;
+'
 ```
 
 ### 4. PHP-Syntax prüfen
@@ -255,126 +154,323 @@ find . -type f -name "*.php" -exec php -l {} \;
 '
 ```
 
-Erwartetes Ergebnis:
+Jede Datei muss mit `No syntax errors detected` bestätigt werden. Bei einem Syntaxfehler darf das Upgrade nicht fortgesetzt werden.
 
-```text
-No syntax errors detected in ./appinfo/routes.php
-No syntax errors detected in ./lib/AppInfo/Application.php
-No syntax errors detected in ./lib/Migration/Version1000Date20260817233000.php
-No syntax errors detected in ./lib/Controller/PageController.php
-No syntax errors detected in ./lib/Dashboard/DaytrackerWidget.php
-No syntax errors detected in ./templates/main.php
+### 5. JavaScript-Syntax prüfen
+
+Falls Node.js im Nextcloud-Container verfügbar ist:
+
+```bash
+docker exec -u www-data nextcloud-aio-nextcloud bash -lc '
+cd /var/www/html/custom_apps/daytracker
+node --check js/main.js
+node --check js/dashboard.js
+'
 ```
 
-### 5. App aktivieren
+Falls Node.js dort nicht verfügbar ist, müssen beide Dateien vor dem Upload lokal mit `node --check` geprüft werden.
+
+### 6. App-Status prüfen
+
+```bash
+docker exec -u www-data nextcloud-aio-nextcloud php occ app:list | grep -A3 -B3 daytracker
+```
+
+Falls die App noch nicht aktiviert ist:
 
 ```bash
 docker exec -u www-data nextcloud-aio-nextcloud php occ app:enable daytracker
 ```
 
-### 6. Optional Reparatur ausführen
+### 7. Upgrade ausführen
+
+```bash
+docker exec -u www-data nextcloud-aio-nextcloud php occ upgrade
+```
+
+### 8. Reparatur ausführen
 
 ```bash
 docker exec -u www-data nextcloud-aio-nextcloud php occ maintenance:repair
 ```
 
-### 7. Container neu starten
+### 9. Container neu starten
 
 ```bash
 docker restart nextcloud-aio-nextcloud
 ```
 
-### 8. Browser hart neu laden
+### 10. Browsercache aktualisieren
+
+Die Daytracker-Seite öffnen und anschließend einen vollständigen Browser-Reload ausführen:
 
 ```text
 Strg + F5
 ```
 
-### 9. Test-URLs
+## Datenbankprüfung
 
-Bitte ersetze `<deine-domain>` durch Deine Nextcloud-Domain.
+### Tabellen anzeigen
+
+```bash
+docker exec -u www-data nextcloud-aio-nextcloud php occ db:convert-type --help >/dev/null
+```
+
+Für eine direkte Prüfung ist die PostgreSQL-Konsole des zugehörigen AIO-Datenbankcontainers zu verwenden. Containername und Zugangsdaten sind der eigenen AIO-Konfiguration zu entnehmen.
+
+In PostgreSQL können die Spalten der vier Tabellen mit folgender Abfrage geprüft werden:
+
+```sql
+SELECT table_name, column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name IN (
+    'oc_daytracker_categories',
+    'oc_daytracker_options',
+    'oc_daytracker_entries',
+    'oc_daytracker_timeslices'
+)
+ORDER BY table_name, ordinal_position;
+```
+
+Erwartete Spalten:
+
+```text
+oc_daytracker_categories:
+  id, user_id, name, sort_order, dashboard_limit, input_mode
+
+oc_daytracker_options:
+  id, category_id, label, sort_order
+
+oc_daytracker_entries:
+  id, user_id, entry_date, timeslice_id, category_id,
+  option_id, text_value, updated_at
+
+oc_daytracker_timeslices:
+  id, user_id, name, sort_order
+```
+
+### Eindeutigkeitsregel prüfen
+
+```sql
+SELECT user_id, entry_date, timeslice_id, category_id, COUNT(*)
+FROM oc_daytracker_entries
+GROUP BY user_id, entry_date, timeslice_id, category_id
+HAVING COUNT(*) > 1;
+```
+
+Die Abfrage soll keine Zeilen zurückgeben.
+
+### Verwaiste Kategoriebezüge prüfen
+
+```sql
+SELECT e.id
+FROM oc_daytracker_entries e
+LEFT JOIN oc_daytracker_categories c ON c.id = e.category_id
+WHERE c.id IS NULL;
+```
+
+### Verwaiste Optionsbezüge prüfen
+
+```sql
+SELECT e.id
+FROM oc_daytracker_entries e
+LEFT JOIN oc_daytracker_options o ON o.id = e.option_id
+WHERE e.option_id IS NOT NULL
+  AND o.id IS NULL;
+```
+
+### Optionen in falschen Kategorien prüfen
+
+```sql
+SELECT e.id, e.category_id, e.option_id, o.category_id AS option_category_id
+FROM oc_daytracker_entries e
+JOIN oc_daytracker_options o ON o.id = e.option_id
+WHERE e.category_id <> o.category_id;
+```
+
+### Verwaiste Zeitscheibenbezüge prüfen
+
+```sql
+SELECT e.id
+FROM oc_daytracker_entries e
+LEFT JOIN oc_daytracker_timeslices t ON t.id = e.timeslice_id
+WHERE t.id IS NULL;
+```
+
+Diese Prüfungen lesen ausschließlich Daten. Sie nehmen keine Reparatur und keine Neuordnung von IDs vor.
+
+## API-Testpfade
+
+Mit eigener Domain aufrufen:
+
+```text
+/index.php/apps/daytracker/
+/index.php/apps/daytracker/api/catalog
+/index.php/apps/daytracker/api/day/YYYY-MM-DD
+/index.php/apps/daytracker/export.csv
+```
+
+Beispiel mit Platzhalter:
 
 ```text
 https://<deine-domain>/index.php/apps/daytracker/
 https://<deine-domain>/index.php/apps/daytracker/api/catalog
-https://<deine-domain>/index.php/apps/daytracker/api/day/2026-08-17
+https://<deine-domain>/index.php/apps/daytracker/api/day/2026-08-20
 https://<deine-domain>/index.php/apps/daytracker/export.csv
 ```
 
-## Prüfcheckliste
+Die beiden POST-Endpunkte sind nicht für einen direkten Browseraufruf vorgesehen. Sie benötigen einen gültigen Nextcloud-CSRF-Token im Header `requesttoken`.
 
-Nach Installation bitte prüfen:
+## Browser-Testcheckliste
 
-1. `php -l` meldet keine Syntaxfehler.
-2. `occ app:enable daytracker` macht Nextcloud nicht unbenutzbar.
-3. Die App-Seite öffnet ohne JavaScript-Fehler.
-4. Beide Kategorien erscheinen: Arbeitsort und Aufenthaltsort.
-5. Alle Optionen erscheinen als Buttons.
-6. Für einen neuen Tag ist kein Button aktiv.
-7. Nach Klick auf eine Option erscheint kurz `Speichere ...`.
-8. Danach erscheint `Gespeichert`.
-9. Nach Reload ist der gespeicherte Button aktiv.
-10. Pro Kategorie ist höchstens ein Button aktiv.
-11. Datumswechsel lädt die Werte des gewählten Tages.
-12. Administration ist beim Laden nicht sichtbar.
-13. Administration öffnet per Button.
-14. Administration schließt per Button, Overlay und ESC.
-15. Administration zeigt Eingabefelder für Kategorien und Optionen.
-16. Kategorie hinzufügen funktioniert.
-17. Administration speichern lädt Katalog und Tageswerte neu.
-18. CSV exportieren ist nur im Modal sichtbar.
-19. CSV-Export öffnet `/index.php/apps/daytracker/export.csv`.
-20. Dashboard Widget erscheint im Dashboard.
-21. Dashboard Widget zeigt Datumsauswahl.
-22. Dashboard Widget zeigt je Kategorie die ersten zwei Optionen.
-23. Dashboard Widget speichert automatisch.
-24. `window.daytrackerDebug.selectedByCategory` zeigt die geladenen Werte.
+### Hauptansicht
 
-## Fehlerdiagnose
+- Daytracker lädt ohne HTTP-500-Fehler.
+- Die Browserkonsole bleibt frei von JavaScript-Fehlern.
+- Der Status wechselt von `Lade ...` zu `Bereit`.
+- Tag und Woche lassen sich umschalten.
+- Datum zurück, Datum vor und Heute funktionieren.
+- Die gewählte Zeitscheibe bleibt innerhalb der Ansicht aktiv.
+- Die Hauptansicht nutzt die verfügbare Seitenbreite.
 
-### JavaScript-Dateien werden scheinbar nicht aktualisiert
+### Tagesansicht
 
-Browser hart neu laden:
+- Jede Kategorie wird als eigene kompakte Karte angezeigt.
+- Ein leerer Tag hebt keine Option hervor.
+- Klick auf eine Option speichert automatisch.
+- Nach dem Speichern ist genau eine Option der Kategorie hervorgehoben.
+- Freitext lässt sich mehrzeilig eingeben.
+- Freitextfelder lassen sich vertikal vergrößern.
+- Der kleine Speichern-Button speichert Freitext.
+- Bei `both` bleiben Option und Freitext gemeinsam erhalten.
+- Der Status wechselt über `Speichere ...` zu `Gespeichert`.
 
-```text
-Strg + F5
+### Wochenansicht
+
+- Montag bis Sonntag werden angezeigt.
+- Kategorien werden zeilenweise dargestellt.
+- Optionswerte lassen sich pro Tag pflegen.
+- Freitext lässt sich pro Tag pflegen.
+- Aktive Optionen werden korrekt hervorgehoben.
+- Die Matrix scrollt bei Bedarf horizontal.
+- Es existiert kein zusätzlicher vertikaler App-Scrollbereich.
+- Alle Kategorien sind über den normalen Nextcloud-Seitenscroll erreichbar.
+
+### Administration
+
+- Das Modal ist beim initialen Laden unsichtbar.
+- Administration öffnet sich über den Button.
+- Schließen funktioniert über X, Schließen, Overlay und Escape.
+- Kategorien lassen sich hinzufügen, umbenennen, sortieren und löschen.
+- Optionen lassen sich hinzufügen, umbenennen, sortieren und löschen.
+- Zeitscheiben lassen sich hinzufügen, umbenennen, sortieren und löschen.
+- Mindestens eine Zeitscheibe bleibt erhalten.
+- Technische IDs sind sichtbar, aber nicht editierbar.
+- Neue Elemente zeigen `neu` und erhalten serverseitig ihre ID.
+- Der Dialog springt nach Hinzufügen, Löschen oder Verschieben nicht nach oben.
+- Speichern zeigt `Administration gespeichert`.
+- Nach Umbenennung bleiben vorhandene Tageswerte zugeordnet.
+- Gelöschte Kategorien und Optionen erscheinen nach erneutem Laden nicht wieder.
+- Der CSV-Link ist nur im Administrationsmodal vorhanden.
+
+### Dashboard
+
+- Das Widget `Daytracker heute` kann zum Dashboard hinzugefügt werden.
+- Datum zurück, Datepicker und Datum vor funktionieren.
+- Die Zeitscheibenauswahl funktioniert.
+- Das Widget bleibt innerhalb seiner verfügbaren Breite.
+- Kategorieüberschriften und Optionsbuttons sind gut lesbar.
+- `dashboard_limit = 0` zeigt keine Optionsbuttons.
+- `dashboard_limit = 2` zeigt die ersten beiden Optionen.
+- Eine gespeicherte sichtbare Option ist hervorgehoben.
+- Eine gespeicherte nicht sichtbare Option wird als Text zusammengefasst.
+- Ein gespeicherter Freitext wird kompakt zusammengefasst.
+- Klick auf eine Option speichert automatisch.
+- Der Link zur vollständigen App funktioniert.
+
+### Benutzertrennung
+
+Die Prüfung erfolgt sinnvollerweise mit zwei Testbenutzern:
+
+- Benutzer A sieht keine Kategorien von Benutzer B.
+- Benutzer A sieht keine Zeitscheiben von Benutzer B.
+- Benutzer A sieht keine Tageswerte von Benutzer B.
+- Benutzer A kann keine fremden technischen IDs über die API verwenden.
+- CSV-Exporte enthalten nur Daten des angemeldeten Benutzers.
+
+## Protokollprüfung
+
+Nextcloud-Protokoll während eines Tests beobachten:
+
+```bash
+docker exec -u www-data nextcloud-aio-nextcloud php occ log:watch
 ```
 
-Alternativ im privaten Fenster testen.
-
-### App wird nicht gefunden
-
-Prüfe die Struktur:
+Falls `log:watch` in der konkreten Installation nicht verfügbar ist, kann das Nextcloud-Protokoll direkt geprüft werden:
 
 ```bash
 docker exec -u www-data nextcloud-aio-nextcloud bash -lc '
-ls -la /var/www/html/custom_apps/daytracker
-ls -la /var/www/html/custom_apps/daytracker/appinfo
+tail -n 200 /var/www/html/data/nextcloud.log
 '
 ```
 
-### PHP-Syntaxfehler finden
+## Rückfallanleitung
 
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud bash -lc '
-cd /var/www/html/custom_apps/daytracker
-find . -type f -name "*.php" -exec php -l {} \;
-'
-```
-
-### App deaktivieren, falls nötig
+### 1. App deaktivieren
 
 ```bash
 docker exec -u www-data nextcloud-aio-nextcloud php occ app:disable daytracker
 ```
 
-## Hinweise zur Wartbarkeit
+### 2. Aktuellen Stand sichern
 
-- Keine minifizierten Einzeiler
-- Keine Build-Abhängigkeit
-- Keine globale Variable `values`
-- Debug über `window.daytrackerDebug`
-- Keine Default-Hervorhebung ohne gespeicherte Einträge
-- Kein `showModal()`
-- Kein `.close()`
-- Keine Boolean-Spalte `highlighted`
+```bash
+docker exec -u root nextcloud-aio-nextcloud bash -lc '
+stamp=$(date +%Y%m%d-%H%M%S)
+mv /var/www/html/custom_apps/daytracker "/var/www/html/custom_apps/daytracker.failed-${stamp}"
+'
+```
+
+### 3. Sicherung zurückkopieren
+
+Den zuvor erzeugten Sicherungspfad einsetzen:
+
+```bash
+docker exec -u root nextcloud-aio-nextcloud bash -lc '
+cp -a /var/www/html/custom_apps/daytracker.backup-<ZEITSTEMPEL> /var/www/html/custom_apps/daytracker
+chown -R www-data:www-data /var/www/html/custom_apps/daytracker
+'
+```
+
+### 4. App wieder aktivieren
+
+```bash
+docker exec -u www-data nextcloud-aio-nextcloud php occ app:enable daytracker
+```
+
+### 5. Reparatur und Neustart
+
+```bash
+docker exec -u www-data nextcloud-aio-nextcloud php occ maintenance:repair
+docker restart nextcloud-aio-nextcloud
+```
+
+Anschließend im Browser `Strg + F5` ausführen.
+
+## Sicherheitsmerkmale
+
+- POST-Routen bleiben CSRF-geschützt.
+- JavaScript sendet `requesttoken: OC.requestToken`.
+- JSON wird über `file_get_contents('php://input')` gelesen.
+- Kategorieabfragen werden über `user_id` abgesichert.
+- Optionen werden über die benutzereigene Kategorie validiert.
+- Zeitscheiben werden über `user_id` validiert.
+- Löschungen erfolgen benutzerbezogen und transaktional.
+- CSV-Export ist benutzerbezogen.
+- CSV-Formelpräfixe werden im Export entschärft.
+
+## Keine automatische Wiederherstellung gelöschter Katalogwerte
+
+Standarddaten werden nur bei einer echten Erstinitialisierung angelegt. Ein benutzerbezogener Nextcloud-Konfigurationsmarker verhindert, dass später gelöschte Kategorien oder Optionen automatisch erneut erscheinen.
+
+Die App legt keine Standardwerte anhand sichtbarer Namen erneut an und ordnet keine bestehenden Tageswerte über Namen oder Array-Positionen um.
