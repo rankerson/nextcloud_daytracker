@@ -84,6 +84,15 @@ daytracker/
 
 ## Installation und Upgrade
 
+Für eine bestehende AIO-Installation übernimmt [update-daytracker.py](update-daytracker.py) den Download des neuesten Releases (oder einer gewählten Version), Prüfsumme, Sicherung, Rechte, Dateiaustausch, Migrationen und Neustart. Auf dem Docker-Host ausführen; die vollständige Anleitung und Fehlerbehandlung stehen in [UPDATE.md](UPDATE.md).
+
+```bash
+sudo python3 update-daytracker.py          # neuestes stabiles Release, mit Rückfragen
+sudo python3 update-daytracker.py v3.0.3   # bestimmte Version
+```
+
+Die folgenden Schritte beschreiben die manuelle Alternative.
+
 ### 1. Sicherung erstellen
 
 Vor dem Austausch der Dateien muss das produktive App-Verzeichnis gesichert werden:

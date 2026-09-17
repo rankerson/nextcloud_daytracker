@@ -1,0 +1,72 @@
+name: Test AIO updater
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - update-daytracker.py
+      - scripts/tests/**
+      - .github/workflows/updater.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  updater:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        nextcloud: ['33', '34.0.4']
+    steps:
+      - name: Fetch tested commit
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/rankerson/nextcloud_daytracker.git
+          git fetch --depth=1 origin "$COMMIT_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Offline validation and failure tests
+        run: python3 -m unittest discover -s scripts/tests -v
+      - name: Prepare disposable Nextcloud and PostgreSQL
+        env:
+          NC_VERSION: ${{ matrix.nextcloud }}
+        run: |
+          docker network create daytracker-updater-test
+          docker run -d --name db --network daytracker-updater-test -e POSTGRES_DB=nextcloud -e POSTGRES_USER=nextcloud -e POSTGRES_PASSWORD=ci-database-only postgres:17
+          docker run -d --name nextcloud --network daytracker-updater-test -p 8080:80 \
+            -e POSTGRES_HOST=db -e POSTGRES_DB=nextcloud -e POSTGRES_USER=nextcloud -e POSTGRES_PASSWORD=ci-database-only \
+            -e NEXTCLOUD_ADMIN_USER=admin -e 'NEXTCLOUD_ADMIN_PASSWORD=Daytracker-CI-test-only-9382!' \
+            -e NEXTCLOUD_TRUSTED_DOMAINS=localhost "nextcloud:${NC_VERSION}-apache"
+          for attempt in $(seq 1 120); do
+            if curl -fsS http://localhost:8080/status.php 2>/dev/null | python3 -c 'import json,sys; assert json.load(sys.stdin)["installed"]' 2>/dev/null; then break; fi
+            sleep 5
+          done
+          docker exec -u www-data nextcloud php occ status
+          curl -fLsS --retry 3 https://github.com/rankerson/nextcloud_daytracker/releases/download/v3.0.2/daytracker-3.0.2.tar.gz -o old.tar.gz
+          mkdir old
+          tar -xzf old.tar.gz -C old
+          docker cp old/daytracker nextcloud:/var/www/html/custom_apps/daytracker
+          docker exec nextcloud chown -R www-data:www-data /var/www/html/custom_apps/daytracker
+          if [ "$NC_VERSION" = '34.0.4' ]; then
+            # Fixture only: create the old installed-but-disabled state after a server upgrade.
+            docker exec -u www-data nextcloud php occ app:enable --force daytracker
+            docker exec -u www-data nextcloud php occ app:disable daytracker
+          else
+            docker exec -u www-data nextcloud php occ app:enable daytracker
+          fi
+          docker exec -i db psql -U nextcloud -d nextcloud -v ON_ERROR_STOP=1 < scripts/tests/seed_updater.sql
+          docker exec nextcloud touch /var/www/html/custom_apps/daytracker/obsolete-file.txt
+      - name: Run actual updater and verify backups and preserved data
+        env:
+          NC_VERSION: ${{ matrix.nextcloud }}
+        run: python3 scripts/tests/integration_updater.py
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          docker logs nextcloud || true
+          docker exec nextcloud tail -n 100 /var/www/html/data/nextcloud.log || true
+          sudo find /var/backups/daytracker-ci -name update.log -exec tail -n 100 {} \; || true
