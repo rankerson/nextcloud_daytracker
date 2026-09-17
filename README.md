@@ -1,12 +1,16 @@
-# Daytracker für Nextcloud 33
+# Daytracker für Nextcloud 33 und 34
 
 Daytracker ist eine native Nextcloud-App zur benutzerbezogenen Erfassung von Tageswerten nach Kategorien und Zeitscheiben.
 
+## Update auf 3.0.3
+
+Nextcloud 34 wurde zuvor allein durch `max-version="33"` blockiert. Version 3.0.3 erlaubt Nextcloud 33–34. Die verwendeten Bootstrap-, Dashboard-, Datenbank- und HTTP-APIs wurden mit dem Nextcloud-34-Quellcode und dem [Upgrade-Leitfaden](https://docs.nextcloud.com/server/stable/developer_manual/release_notes/previous/upgrade_to_34.html) abgeglichen. Die App benötigt keine der dort entfernten Frontend-Bibliotheken. Automatisierte Integrationstests prüfen Installation, API und Browserfunktionen mit PostgreSQL auf Nextcloud 33 und 34.0.4; ein Test in deiner produktiven AIO-Instanz ist damit nicht ersetzt.
+
 ## Zielumgebung
 
-- Nextcloud 33
+- Nextcloud 33 oder 34 (einschließlich 34.0.4)
 - Nextcloud AIO
-- PHP 8.1 oder höher
+- PHP 8.2 oder höher (zusätzlich gelten die Anforderungen der Nextcloud-Version)
 - PostgreSQL
 - App-ID `daytracker`
 - Namespace `OCA\Daytracker`
@@ -48,7 +52,7 @@ oc_daytracker_timeslices
 
 Die vorhandenen Primärschlüssel und Fremdschlüsselbeziehungen bleiben erhalten. Kategorien, Optionen und Zeitscheiben werden über ihre technischen IDs referenziert. Sichtbare Namen und Labels sind keine Zuordnungsschlüssel.
 
-Diese Version enthält keine neue Migration. Vorhandene historische Migrationen unter `appinfo/migrations/` müssen erhalten bleiben.
+Diese Version enthält keine neue Migration. Vorhandene historische Migrationen unter `lib/Migration/` müssen erhalten bleiben.
 
 ## Dateien der vollständigen Version
 
@@ -56,9 +60,7 @@ Diese Version enthält keine neue Migration. Vorhandene historische Migrationen 
 daytracker/
 ├── appinfo/
 │   ├── info.xml
-│   ├── routes.php
-│   └── migrations/
-│       └── vorhandene historische Migrationen, unverändert
+│   └── routes.php
 ├── css/
 │   └── style.css
 ├── img/
@@ -71,8 +73,10 @@ daytracker/
 │   │   └── Application.php
 │   ├── Controller/
 │   │   └── PageController.php
-│   └── Dashboard/
-│       └── DaytrackerWidget.php
+│   ├── Dashboard/
+│   │   └── DaytrackerWidget.php
+│   └── Migration/
+│       └── vorhandene historische Migrationen, unverändert
 ├── templates/
 │   └── main.php
 └── README.md
@@ -88,46 +92,31 @@ Vor dem Austausch der Dateien muss das produktive App-Verzeichnis gesichert werd
 docker exec -u root nextcloud-aio-nextcloud bash -lc '
 set -e
 stamp=$(date +%Y%m%d-%H%M%S)
-cp -a /var/www/html/custom_apps/daytracker "/var/www/html/custom_apps/daytracker.backup-${stamp}"
-echo "Sicherung: /var/www/html/custom_apps/daytracker.backup-${stamp}"
+mkdir -p /var/www/daytracker-backups
+cp -a /var/www/html/custom_apps/daytracker "/var/www/daytracker-backups/daytracker-${stamp}"
+echo "Sicherung: /var/www/daytracker-backups/daytracker-${stamp}"
 '
 ```
 
 Eine zusätzliche PostgreSQL-Sicherung entsprechend dem bestehenden AIO-Sicherungskonzept wird empfohlen, bevor produktive Dateien ersetzt werden.
 
-### 2. Pakete zusammenführen
+### 2. Release installieren
 
-Die ZIP-Archive enthalten jeweils den obersten Ordner `daytracker/`. Alle fünf Pakete müssen lokal in dasselbe Zielverzeichnis entpackt werden. Gleichnamige Dateien werden ersetzt.
+Das vollständige Archiv [daytracker-3.0.3.tar.gz](https://github.com/rankerson/nextcloud_daytracker/releases/tag/v3.0.3) herunterladen und anhand der beigefügten SHA-256-Datei prüfen. Es enthält genau einen App-Ordner `daytracker/`; mehrere Pakete müssen nicht mehr zusammengeführt werden.
 
-Die vorhandenen historischen Dateien unter `appinfo/migrations/` dürfen nicht gelöscht werden.
+Auf dem Docker-Host in ein leeres Arbeitsverzeichnis entpacken:
 
-Das zusammengeführte Verzeichnis wird anschließend nach folgendem Pfad kopiert:
+```bash
+sha256sum -c daytracker-3.0.3.tar.gz.sha256
+tar -xzf daytracker-3.0.3.tar.gz
+```
+
+Nach der Sicherung das vorhandene App-Verzeichnis durch den vollständigen neuen Ordner ersetzen. Die Sicherung außerhalb von `custom_apps/` aufbewahren, damit Nextcloud sie nicht als zweite App erkennt. Das Archiv enthält alle historischen Migrationen unter `lib/Migration/`.
+
+Zielpfad im AIO-Container:
 
 ```text
 /var/www/html/custom_apps/daytracker
-```
-
-Es dürfen keine alten Fix-Dateien aktiv bleiben. Insbesondere sind folgende früher möglicherweise verwendete Dateien zu entfernen, falls sie noch existieren:
-
-```text
-css/ui-runtime-fix.css
-css/dashboard-button-fix.css
-css/dashboard.css
-js/ui-runtime-fix.js
-js/dashboard-button-fix.js
-```
-
-Entfernen im Container:
-
-```bash
-docker exec -u root nextcloud-aio-nextcloud bash -lc '
-rm -f \
-  /var/www/html/custom_apps/daytracker/css/ui-runtime-fix.css \
-  /var/www/html/custom_apps/daytracker/css/dashboard-button-fix.css \
-  /var/www/html/custom_apps/daytracker/css/dashboard.css \
-  /var/www/html/custom_apps/daytracker/js/ui-runtime-fix.js \
-  /var/www/html/custom_apps/daytracker/js/dashboard-button-fix.js
-'
 ```
 
 ### 3. Rechte setzen
@@ -170,7 +159,13 @@ node --check js/dashboard.js
 
 Falls Node.js dort nicht verfügbar ist, müssen beide Dateien vor dem Upload lokal mit `node --check` geprüft werden.
 
-### 6. App-Status prüfen
+### 6. Upgrade ausführen
+
+```bash
+docker exec -u www-data nextcloud-aio-nextcloud php occ upgrade
+```
+
+### 7. App-Status prüfen
 
 ```bash
 docker exec -u www-data nextcloud-aio-nextcloud php occ app:list | grep -A3 -B3 daytracker
@@ -180,12 +175,6 @@ Falls die App noch nicht aktiviert ist:
 
 ```bash
 docker exec -u www-data nextcloud-aio-nextcloud php occ app:enable daytracker
-```
-
-### 7. Upgrade ausführen
-
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud php occ upgrade
 ```
 
 ### 8. Reparatur ausführen
@@ -236,7 +225,7 @@ Erwartete Spalten:
 
 ```text
 oc_daytracker_categories:
-  id, user_id, name, sort_order, dashboard_limit, input_mode
+  id, user_id, name, sort_order, dashboard_limit, dashboard_enabled, input_mode
 
 oc_daytracker_options:
   id, category_id, label, sort_order
@@ -437,7 +426,7 @@ Den zuvor erzeugten Sicherungspfad einsetzen:
 
 ```bash
 docker exec -u root nextcloud-aio-nextcloud bash -lc '
-cp -a /var/www/html/custom_apps/daytracker.backup-<ZEITSTEMPEL> /var/www/html/custom_apps/daytracker
+cp -a /var/www/daytracker-backups/daytracker-<ZEITSTEMPEL> /var/www/html/custom_apps/daytracker
 chown -R www-data:www-data /var/www/html/custom_apps/daytracker
 '
 ```

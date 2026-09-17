@@ -281,7 +281,7 @@ final class PageController extends Controller
             throw new \RuntimeException('CSV-Ausgabe konnte nicht erzeugt werden.');
         }
         fwrite($stream, "\xEF\xBB\xBF");
-        fputcsv($stream, ['Datum', 'Zeitscheibe', 'Kategorie', 'Option', 'Freitext', 'letztes Änderungsdatum'], ';');
+        fputcsv($stream, ['Datum', 'Zeitscheibe', 'Kategorie', 'Option', 'Freitext', 'letztes Änderungsdatum'], ';', '"', '');
         $result = $query->executeQuery();
         while ($row = $result->fetchAssociative()) {
             fputcsv($stream, [
@@ -291,7 +291,7 @@ final class PageController extends Controller
                 $this->safeCsvCell((string)($row['option_label'] ?? '')),
                 $this->safeCsvCell((string)($row['text_value'] ?? '')),
                 $this->safeCsvCell((string)$row['updated_at']),
-            ], ';');
+            ], ';', '"', '');
         }
         $result->closeCursor();
         rewind($stream);

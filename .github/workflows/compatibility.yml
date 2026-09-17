@@ -1,0 +1,92 @@
+name: Nextcloud compatibility and release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - appinfo/**
+      - lib/**
+      - js/**
+      - css/**
+      - templates/**
+      - tests/**
+      - .github/workflows/compatibility.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        nextcloud: ['33', '34.0.4']
+    steps:
+      - name: Fetch exact app commit
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/rankerson/nextcloud_daytracker.git
+          git fetch --depth=1 origin "$COMMIT_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Start disposable PostgreSQL and Nextcloud
+        env:
+          NC_VERSION: ${{ matrix.nextcloud }}
+        run: |
+          docker network create daytracker-test
+          docker run -d --name db --network daytracker-test -e POSTGRES_DB=nextcloud -e POSTGRES_USER=nextcloud -e POSTGRES_PASSWORD=ci-database-only postgres:17
+          docker run -d --name nextcloud --network daytracker-test -p 8080:80 \
+            -e POSTGRES_HOST=db -e POSTGRES_DB=nextcloud -e POSTGRES_USER=nextcloud -e POSTGRES_PASSWORD=ci-database-only \
+            -e NEXTCLOUD_ADMIN_USER=admin -e 'NEXTCLOUD_ADMIN_PASSWORD=Daytracker-CI-test-only-9382!' \
+            -e NEXTCLOUD_TRUSTED_DOMAINS=localhost "nextcloud:${NC_VERSION}-apache"
+          for attempt in $(seq 1 120); do
+            if curl -fsS http://localhost:8080/status.php | python3 -c 'import json,sys; assert json.load(sys.stdin)["installed"]'; then break; fi
+            sleep 5
+          done
+          docker exec -u www-data nextcloud php occ status
+          docker cp . nextcloud:/var/www/html/custom_apps/daytracker
+          docker exec nextcloud chown -R www-data:www-data /var/www/html/custom_apps/daytracker
+          docker exec -u www-data nextcloud php occ app:enable daytracker
+          docker exec -u www-data nextcloud php occ config:system:set auth.bruteforce.protection.enabled --type=boolean --value=false
+          docker exec -u www-data -e 'OC_PASS=Daytracker-CI-test-only-9382!' nextcloud php occ user:add --password-from-env tester
+          docker exec -u www-data nextcloud php occ user:setting admin dashboard layout daytracker
+      - name: Syntax and browser checks
+        run: |
+          docker exec nextcloud sh -c 'find /var/www/html/custom_apps/daytracker/lib /var/www/html/custom_apps/daytracker/templates /var/www/html/custom_apps/daytracker/appinfo -name "*.php" -exec php -l {} \;'
+          node --check js/main.js
+          node --check js/dashboard.js
+          pip install playwright==1.55.0
+          python -m playwright install --with-deps chromium
+          python tests/smoke.py
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          docker logs nextcloud
+          docker exec nextcloud tail -n 100 /var/www/html/data/nextcloud.log || true
+
+  release:
+    needs: smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Fetch tested commit and publish v3.0.3
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init .
+          git remote add origin https://github.com/rankerson/nextcloud_daytracker.git
+          git fetch --depth=1 origin "$COMMIT_SHA"
+          git checkout --detach FETCH_HEAD
+          python3 -c 'import xml.etree.ElementTree as E; assert E.parse("appinfo/info.xml").findtext("version") == "3.0.3"'
+          if gh release view v3.0.3 --repo rankerson/nextcloud_daytracker >/dev/null 2>&1; then exit 0; fi
+          git archive --format=tar.gz --prefix=daytracker/ --output=daytracker-3.0.3.tar.gz HEAD appinfo css img js lib templates LICENSE README.md RELEASES.md
+          sha256sum daytracker-3.0.3.tar.gz > daytracker-3.0.3.tar.gz.sha256
+          gh release create v3.0.3 daytracker-3.0.3.tar.gz daytracker-3.0.3.tar.gz.sha256 \
+            --repo rankerson/nextcloud_daytracker --target "$COMMIT_SHA" --title 'Daytracker v3.0.3 – Nextcloud 34' \
+            --notes-file release-notes/3.0.3.md --latest

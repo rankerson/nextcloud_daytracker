@@ -1,5 +1,11 @@
 # Versionen und Releases
 
+## Aktuell: v3.0.3
+
+[v3.0.3](https://github.com/rankerson/nextcloud_daytracker/releases/tag/v3.0.3) erweitert die Unterstützung auf Nextcloud 33–34 und korrigiert den CSV-Export für aktuelle PHP-Versionen. Die Veröffentlichung erfolgt erst nach erfolgreichen Browser- und API-Tests auf Nextcloud 33 und 34.0.4 mit PostgreSQL. Einzelheiten stehen in `release-notes/3.0.3.md`.
+
+## Historische Versionen
+
 Die früheren Versionsordner sind als eigenständige Git-Tags erhalten. Jeder Tag enthält die App direkt im Hauptverzeichnis sowie die Repository-Lizenz.
 
 | Version | Tag-Commit | Ursprünglicher Ordner |
