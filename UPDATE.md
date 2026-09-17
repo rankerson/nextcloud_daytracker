@@ -1,6 +1,6 @@
 # Daytracker mit einem Befehl aktualisieren
 
-`update-daytracker.py` läuft auf dem **Linux-Docker-Host** einer bestehenden Nextcloud-AIO-Installation. Es benötigt Python ab 3.9, Docker CLI, sudo/root und HTTPS-Zugriff auf GitHub. Zusätzliche Python-Pakete oder Git werden nicht benötigt. Das Skript aktualisiert eine bereits installierte App; es installiert keinen Nextcloud-Server.
+`update-daytracker.py` läuft auf dem **Linux-Docker-Host** einer Nextcloud-AIO-Installation. Es benötigt Python ab 3.9, Docker CLI, sudo/root und HTTPS-Zugriff auf GitHub. Zusätzliche Python-Pakete oder Git werden nicht benötigt. Das Skript installiert Daytracker erstmalig oder aktualisiert eine vorhandene App; es installiert keinen Nextcloud-Server.
 
 ## Herunterladen und starten
 
@@ -35,6 +35,16 @@ sudo python3 update-daytracker.py v3.0.3
 
 Das Skript ist als einzelne Python-Datei ausgeführt. Für spätere Updates genügt derselbe Aufruf; es lädt die App jeweils selbst von GitHub. Aktualisierungen am Skript selbst erhältst du durch erneutes Herunterladen. Die App-Archive enthalten das Host-Skript nicht.
 
+### Installation oder Update erkennen
+
+Das Skript prüft selbst, ob `/var/www/html/custom_apps/daytracker` und eine registrierte Daytracker-Version vorhanden sind:
+
+- Fehlt die App, wird das ausgewählte Release installiert. Nextcloud führt anschließend mit `occ app:enable` die Erstinstallation und Migrationen aus.
+- Ist die App vorhanden, wird sie vollständig ersetzt und aktualisiert. Vorhandene Aktivierungs- und Gruppenbeschränkungen bleiben erhalten.
+- Existieren App-Dateien, aber keine Registrierung, behandelt das Skript dies als Erstinstallation. Ein widersprüchlicher registrierter Versionsstand führt aus Sicherheitsgründen zum Abbruch.
+
+Bei einer Erstinstallation wird vor der Änderung gefragt, ob die App aktiviert werden soll. Mit `--yes --enable` lässt sich eine unbeaufsichtigte Installation direkt aktivieren.
+
 ### Nach dem Update auf Nextcloud 34 deaktivierte App
 
 Beim normalen Aufruf die Frage nach der Aktivierung mit Ja beantworten und den angezeigten Updateablauf bestätigen. Das Skript ersetzt die alte App durch das ausgewählte kompatible Release und aktiviert sie nach den erforderlichen Migrationen.
@@ -61,12 +71,12 @@ Andere Containernamen und den Sicherungsort über die unten beschriebenen Option
 
 ## Ablauf und Rückfragen
 
-1. Container, Nextcloud-Status, installierte App-Version und PostgreSQL-Zuordnung prüfen.
+1. Container, Nextcloud-Status, vorhandene App-Dateien, registrierte App-Version und PostgreSQL-Zuordnung prüfen.
 2. Gewünschtes GitHub-Release laden, SHA-256 kontrollieren, Archivinhalt und App-ID/Version sowie Nextcloud-/PHP-Kompatibilität prüfen. Downgrades und Vorabversionen werden abgelehnt.
 3. Zielversion, Container, Sicherungspfad und Wartungszeit anzeigen. Bei einer deaktivierten App fragen, ob sie anschließend aktiviert werden soll. Vor Beginn der Änderungen bestätigen lassen; Enter bedeutet Nein.
 4. Neue Dateien außerhalb des App-Verzeichnisses bereitstellen, PHP-Syntax prüfen und Besitzer/Rechte auf `www-data:www-data`, Verzeichnisse `750`, Dateien `640` setzen.
 5. Nextcloud in den Wartungsmodus setzen. Vor jedem Dateiaustausch die bisherige App, die Nextcloud-Konfiguration und gezielt die Daytracker-Datenbankobjekte sichern und die Sicherungen prüfen. Mit `--full-db-backup` zusätzlich einen vollständigen PostgreSQL-Dump erstellen.
-6. App-Verzeichnis vollständig austauschen; damit bleiben keine veralteten Dateien liegen. `occ upgrade` führt notwendige Updates und Migrationen aktiver Apps aus. Bei einer deaktivierten App führt `occ app:enable` die Installation und Migrationen des lokalen Pakets aus; auf Wunsch wird sie danach wieder deaktiviert. Bestehende Gruppenbeschränkungen einer aktiven App bleiben erhalten.
+6. Bei einer Erstinstallation das neue App-Verzeichnis anlegen, bei einem Update vollständig austauschen; damit bleiben keine veralteten Dateien liegen. `occ app:enable` führt bei der Erstinstallation oder einer deaktivierten App die erforderlichen Migrationen aus. Bei einer aktiven App führt `occ upgrade` notwendige Updates und Migrationen aus. Bestehende Gruppenbeschränkungen bleiben erhalten.
 7. Registrierte Version und Aktivierungsstatus prüfen, Nextcloud-Container neu starten und Bereitschaft prüfen. Abschließend den Wartungsmodus ausschalten. Im Browser vollständig neu laden.
 
 Alle `occ`-Befehle laufen als `www-data`. Historische Migrationen werden ausschließlich durch Nextcloud ausgeführt, nicht direkt per SQL oder `migration:execute`. Ein zusätzliches pauschales `maintenance:repair` ist nicht nötig; die App-Reparaturschritte gehören zum Nextcloud-Updateablauf. Der normale App-Store-Updater wird nicht aufgerufen.

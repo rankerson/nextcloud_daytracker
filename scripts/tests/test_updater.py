@@ -76,13 +76,22 @@ class FakeDocker:
             return self.installed if args[2] == "installed_version" else self.enabled
         return "OK"
 
-    def backup(self, directory, *, full_database=False):
+    def backup(self, directory, *, full_database=False, include_app=True, include_daytracker=True):
         self.calls.append(("backup",))
         if self.failure == "backup":
             raise u.UpdateError("disk full")
 
 
 class UpdaterTests(unittest.TestCase):
+    def test_initial_install_uses_app_enable_without_existing_app_backup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            updater, docker = self.transaction(temp, enabled="no")
+            updater.perform(Path(temp), "3.0.3", None, "no", "0" * 64, False, False)
+            self.assertEqual(docker.installed, "3.0.3")
+            self.assertEqual(docker.enabled, "no")
+            self.assertTrue(any(call[0] == "backup" for call in docker.calls))
+            self.assertTrue(any(call[0] == "app:enable" for call in docker.calls))
+
     def test_scoped_backup_includes_sequences_and_only_app_state(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -204,7 +213,7 @@ class UpdaterTests(unittest.TestCase):
         for enabled, enable in (("yes", False), ("no", False), ("no", True), ('["team"]', False)):
             with self.subTest(enabled=enabled, enable=enable), tempfile.TemporaryDirectory() as temp:
                 updater, docker = self.transaction(temp, enabled=enabled, enable=enable)
-                updater.perform(Path(temp), "3.0.3", "3.0.2", enabled, "0" * 64)
+                updater.perform(Path(temp), "3.0.3", "3.0.2", enabled, "0" * 64, True, True)
                 self.assertFalse(docker.maintenance)
                 self.assertEqual(docker.installed, "3.0.3")
                 self.assertEqual(docker.enabled, "yes" if enable else enabled)
@@ -215,7 +224,7 @@ class UpdaterTests(unittest.TestCase):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temp:
                 updater, docker = self.transaction(temp, failure=failure)
                 with self.assertRaises(u.UpdateError):
-                    updater.perform(Path(temp), "3.0.3", "3.0.2", "yes", "0" * 64)
+                    updater.perform(Path(temp), "3.0.3", "3.0.2", "yes", "0" * 64, True, True)
                 updater.recover()
                 self.assertFalse(docker.swapped)
                 self.assertFalse(docker.maintenance)
@@ -225,7 +234,7 @@ class UpdaterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             updater, docker = self.transaction(temp, failure="filesystem")
             with self.assertRaises(u.UpdateError):
-                updater.perform(Path(temp), "3.0.3", "3.0.2", "yes", "0" * 64)
+                updater.perform(Path(temp), "3.0.3", "3.0.2", "yes", "0" * 64, True, True)
             updater.recover()
             self.assertFalse(docker.swapped)
             self.assertNotIn(("backup",), docker.calls)
@@ -236,7 +245,7 @@ class UpdaterTests(unittest.TestCase):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temp:
                 updater, docker = self.transaction(temp, failure=failure)
                 with self.assertRaises(u.UpdateError):
-                    updater.perform(Path(temp), "3.0.3", "3.0.2", "yes", "0" * 64)
+                    updater.perform(Path(temp), "3.0.3", "3.0.2", "yes", "0" * 64, True, True)
                 updater.recover()
                 self.assertTrue(docker.swapped)
                 self.assertTrue(docker.maintenance)

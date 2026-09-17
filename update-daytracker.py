@@ -112,7 +112,7 @@ def prepare_release(requested, work, current, server, php):
     version_tuple(target)
     if release.get("draft") or release.get("prerelease") or (requested != "latest" and target != requested):
         raise UpdateError("Release ist kein passendes veröffentlichtes stabiles Release.")
-    if version_tuple(target) < version_tuple(current):
+    if current is not None and version_tuple(target) < version_tuple(current):
         raise UpdateError(f"Downgrade {current} → {target} verweigert. Stattdessen eine vollständige Sicherung wiederherstellen.")
     filename = f"daytracker-{target}.tar.gz"
     assets = {asset["name"]: asset for asset in release.get("assets", [])}
@@ -231,8 +231,10 @@ class Docker:
             output.write(("\n" + "\n".join(state) + "\n").encode("utf-8"))
         partial.rename(directory / "restore-daytracker.sql")
 
-    def backup(self, directory, *, full_database=False):
-        for name, folder in (("app.tar.gz", "custom_apps/daytracker"), ("config.tar.gz", "config")):
+    def backup(self, directory, *, full_database=False, include_app=True, include_daytracker=True):
+        folders = [("app.tar.gz", "custom_apps/daytracker")] if include_app else []
+        folders.append(("config.tar.gz", "config"))
+        for name, folder in folders:
             partial = directory / (name + ".partial")
             with partial.open("xb") as output:
                 self.command("exec", "--user", "root", self.container, "tar", "-czf", "-", "-C", "/var/www/html", folder, output=output)
@@ -240,7 +242,8 @@ class Docker:
                 if not archive.getmembers():
                     raise UpdateError("Dateisicherung ist leer.")
             partial.rename(directory / name)
-        self.backup_daytracker(directory)
+        if include_daytracker:
+            self.backup_daytracker(directory)
         if not full_database:
             return
         partial = directory / "database.dump.partial"
@@ -260,6 +263,7 @@ class Updater:
         self.exchange_started = False
         self.migration_started = False
         self.backup_dir = None
+        self.app_exists = True
 
     def preflight(self):
         for container in (self.args.container, self.args.database_container):
@@ -268,36 +272,57 @@ class Updater:
         status = self.docker.status()
         if not status.get("installed") or status.get("maintenance") or status.get("needsDbUpgrade"):
             raise UpdateError("Nextcloud ist nicht bereit: Installation, Wartungsmodus oder ein anderes ausstehendes Upgrade prüfen.")
-        self.docker.shell('test -d "$1"; test ! -L "$1"; test "$(readlink -f "$1")" = "$1"', APP)
+        app_exists = True
+        try:
+            self.docker.shell('test -d "$1"; test ! -L "$1"; test "$(readlink -f "$1")" = "$1"', APP)
+        except UpdateError:
+            try:
+                self.docker.command("exec", self.args.container, "test", "-e", APP)
+            except UpdateError:
+                app_exists = False
+            else:
+                raise UpdateError("Das Daytracker-Zielverzeichnis ist kein sicherer, echter Ordner.")
         php = self.docker.command("exec", self.args.container, "php", "-r", 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION.".".PHP_RELEASE_VERSION;')
-        info = self.docker.command("exec", self.args.container, "php", "-r",
-                                   '$x=simplexml_load_file($argv[1]); echo json_encode([(string)$x->id,(string)$x->version]);', APP + "/appinfo/info.xml")
-        app_id, current = json.loads(info)
-        registered = self.docker.occ("config:app:get", "daytracker", "installed_version")
-        if app_id != "daytracker" or current != registered:
+        app_id = current = registered = None
+        if app_exists:
+            info = self.docker.command("exec", self.args.container, "php", "-r",
+                                       '$x=simplexml_load_file($argv[1]); echo json_encode([(string)$x->id,(string)$x->version]);', APP + "/appinfo/info.xml")
+            app_id, current = json.loads(info)
+            if app_id != "daytracker":
+                raise UpdateError("Das vorhandene custom_app-Verzeichnis enthält keine Daytracker-App.")
+            version_tuple(current)
+        try:
+            registered = self.docker.occ("config:app:get", "daytracker", "installed_version")
+        except UpdateError:
+            registered = None
+        if registered is not None and current != registered:
             raise UpdateError("Dateien und registrierte Daytracker-Version stimmen nicht überein. Vorherigen Updateversuch zuerst klären.")
-        version_tuple(current)
         if self.docker.occ("config:system:get", "dbtype") != "pgsql":
             raise UpdateError("Dieses AIO-Skript benötigt PostgreSQL.")
         db_name = self.docker.occ("config:system:get", "dbname")
         actual_db = self.docker.command("exec", self.args.database_container, "sh", "-ec", 'printf %s "${POSTGRES_DB:?}"; command -v pg_dump >/dev/null; command -v pg_restore >/dev/null')
         if db_name != actual_db:
             raise UpdateError("Datenbankname und gewählter Datenbankcontainer stimmen nicht überein.")
-        enabled = self.docker.occ("config:app:get", "daytracker", "enabled")
+        try:
+            enabled = self.docker.occ("config:app:get", "daytracker", "enabled")
+        except UpdateError:
+            enabled = "no"
         if enabled not in ("yes", "no"):
             groups = json.loads(enabled)
             if not isinstance(groups, list) or not groups or not all(isinstance(g, str) and g for g in groups):
                 raise UpdateError("Unbekannter App-Aktivierungszustand.")
-        return current, status["versionstring"], php, enabled
+        return current, status["versionstring"], php, enabled, app_exists, registered is not None
 
-    def perform(self, app, target, current, enabled, digest):
+    def perform(self, app, target, current, enabled, digest, app_exists, registered):
+        self.app_exists = app_exists
         # Prepare and lint outside custom_apps, before the maintenance window.
         self.stage = self.docker.shell("mktemp -d /var/www/html/.daytracker-update-XXXXXXXX")
         if not re.fullmatch(r"/var/www/html/\.daytracker-update-[A-Za-z0-9]+", self.stage):
             self.stage = None
             raise UpdateError("Unerwarteter temporärer Containerpfad.")
         # mv must rename, never fall back to a partial cross-filesystem copy.
-        self.docker.shell('test "$(stat -c %d "$1")" = "$(stat -c %d "$2")"', APP, self.stage)
+        if app_exists:
+            self.docker.shell('test "$(stat -c %d "$1")" = "$(stat -c %d "$2")"', APP, self.stage)
         self.docker.command("cp", str(app), self.args.container + ":" + self.stage + "/daytracker")
         self.docker.shell('chown -R www-data:www-data "$1"; find "$1" -type d -exec chmod 750 {} +; find "$1" -type f -exec chmod 640 {} +', self.stage + "/daytracker")
         self.docker.shell('find "$1" -name "*.php" -type f -exec sh -ec \'for f do php -l "$f" >/dev/null || exit 1; done\' sh {} +', self.stage + "/daytracker")
@@ -307,7 +332,8 @@ class Updater:
         self.docker.log = self.backup_dir / "update.log"
         (self.backup_dir / "update.json").write_text(json.dumps({"from": current, "to": target, "sha256": digest,
             "container": self.args.container, "database_container": self.args.database_container, "enabled_before": enabled,
-            "app_path": APP, "stage": self.stage, "database_backup": "daytracker+full" if self.args.full_db_backup else "daytracker"}, indent=2) + "\n", encoding="utf-8")
+            "app_path": APP, "stage": self.stage, "operation": "update" if registered else "install",
+            "database_backup": "daytracker+full" if self.args.full_db_backup else "daytracker"}, indent=2) + "\n", encoding="utf-8")
         (self.backup_dir / "RECOVERY.txt").write_text(
             "Daytracker-Sicherung: App-Dateien, Tabellen mit Sequenzen sowie Daytracker-Zeilen aus appconfig, migrations und preferences.\n"
             "restore-daytracker.sql enthält die gezielte Datenbank-Rücksicherung.\n"
@@ -327,11 +353,15 @@ class Updater:
         self.maintenance = True  # Also recover if the command is interrupted after changing config.
         print("Wartungsmodus einschalten und Sicherung erstellen …", flush=True)
         self.docker.occ("maintenance:mode", "--on")
-        self.docker.backup(self.backup_dir, full_database=self.args.full_db_backup)
+        self.docker.backup(self.backup_dir, full_database=self.args.full_db_backup,
+                           include_app=app_exists, include_daytracker=registered)
         print(f"Sicherung abgeschlossen: {self.backup_dir}", flush=True)
         self.exchange_started = True
-        self.docker.shell('mv "$1" "$2/previous"; mv "$2/daytracker" "$1"', APP, self.stage)
-        if enabled == "no":
+        if app_exists:
+            self.docker.shell('mv "$1" "$2/previous"; mv "$2/daytracker" "$1"', APP, self.stage)
+        else:
+            self.docker.shell('mv "$2/daytracker" "$1"', APP, self.stage)
+        if not registered or enabled == "no":
             # app:enable installs the local package and runs its migrations/repair steps.
             self.migration_started = True
             print(self.docker.occ("app:enable", "daytracker"), flush=True)
@@ -343,7 +373,7 @@ class Updater:
         if self.docker.occ("config:app:get", "daytracker", "installed_version") != target:
             raise UpdateError("Nextcloud meldet nach dem Update nicht die erwartete App-Version.")
         final_enabled = self.docker.occ("config:app:get", "daytracker", "enabled")
-        expected_enabled = "yes" if enabled == "no" and self.args.enable else enabled
+        expected_enabled = "yes" if (self.args.enable or (registered and enabled == "no" and self.args.enable)) else enabled
         if final_enabled != expected_enabled:
             raise UpdateError("App-Aktivierungszustand ist unerwartet; bitte prüfen.")
         if not self.args.no_restart:
@@ -379,7 +409,10 @@ class Updater:
             return
         try:
             if self.exchange_started:
-                self.docker.shell('if [ -d "$2/previous" ]; then if [ -e "$1" ]; then mv "$1" "$2/failed"; fi; mv "$2/previous" "$1"; fi', APP, self.stage)
+                if self.app_exists:
+                    self.docker.shell('if [ -d "$2/previous" ]; then if [ -e "$1" ]; then mv "$1" "$2/failed"; fi; mv "$2/previous" "$1"; fi', APP, self.stage)
+                else:
+                    self.docker.shell('if [ -e "$1" ]; then mv "$1" "$2/failed"; fi', APP, self.stage)
             if self.maintenance:
                 self.docker.occ("maintenance:mode", "--off")
                 self.maintenance = False
@@ -436,16 +469,17 @@ def main(argv=None):
         except BlockingIOError as error:
             raise UpdateError("Für diesen Container läuft bereits ein Daytracker-Update.") from error
         updater = Updater(Docker(args.container, args.database_container), args)
-        current, server, php, enabled = updater.preflight()
+        current, server, php, enabled, app_exists, registered = updater.preflight()
         with tempfile.TemporaryDirectory(prefix="daytracker-download-") as directory:
             target, app, digest = prepare_release(args.version, Path(directory), current, server, php)
-            print(f"Nextcloud {server}, PHP {php}\nDaytracker: {current} → {target}\nRelease: https://github.com/{REPO}/releases/tag/v{target}\nSHA-256: {digest}")
-            if current == target and not args.reinstall:
+            operation = "Update" if registered else "Installation"
+            print(f"Nextcloud {server}, PHP {php}\n{operation}: {current or 'nicht installiert'} → {target}\nRelease: https://github.com/{REPO}/releases/tag/v{target}\nSHA-256: {digest}")
+            if registered and current == target and not args.reinstall:
                 print("Diese Version ist bereits installiert. Für erneute Installation/Aktivierung --reinstall verwenden.")
                 return 0
             print(f"Container: {args.container}; PostgreSQL: {args.database_container}\nSicherungen auf dem Host: {Path(args.backup_dir).resolve()}\n"
                   "Die gesamte Nextcloud wird für Sicherung, Dateiaustausch und Migrationen in den Wartungsmodus versetzt.\n"
-                  "Sicherung: Daytracker-Tabellen, ID-Sequenzen, App-Konfiguration, Migrationen und Benutzereinstellungen; keine Benutzerdateien.\n"
+                  + ("Sicherung: Daytracker-Tabellen, ID-Sequenzen, App-Konfiguration, Migrationen und Benutzereinstellungen; keine Benutzerdateien.\n" if registered else "Erstinstallation: Es existieren noch keine Daytracker-Daten; App-Dateien und Nextcloud-Konfiguration werden gesichert.\n")
                   + ("Zusätzlich wird die gesamte Nextcloud-Datenbank gesichert.\n" if args.full_db_backup else "Kein vollständiger Nextcloud-Datenbankdump.\n")
                   + ("Container-Neustart wird übersprungen." if args.no_restart else "Der Nextcloud-Container wird danach neu gestartet."))
             if args.dry_run:
@@ -457,7 +491,7 @@ def main(argv=None):
                 print("Abgebrochen; keine Serveränderungen.")
                 return 0
             try:
-                updater.perform(app, target, current, enabled, digest)
+                updater.perform(app, target, current, enabled, digest, app_exists, registered)
             except (Exception, KeyboardInterrupt):
                 updater.recover()
                 raise

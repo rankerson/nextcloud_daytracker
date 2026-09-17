@@ -88,7 +88,7 @@ daytracker/
 
 ### Bestehende AIO-Installation aktualisieren (empfohlen)
 
-[update-daytracker.py](update-daytracker.py) übernimmt Download, Prüfsumme, Sicherung, Rechte, Dateiaustausch, notwendige Migrationen und Neustart. Voraussetzung: eine bereits installierte Daytracker-App, Linux-Docker-Host mit Python ab 3.9, Docker CLI, `curl`, sudo/root und HTTPS-Zugriff auf GitHub. Die Befehle auf dem **Docker-Host** ausführen.
+[update-daytracker.py](update-daytracker.py) übernimmt Erstinstallation und Updates: Download, Prüfsumme, Sicherung, Rechte, Dateiaustausch, notwendige Migrationen und Neustart. Voraussetzung: Linux-Docker-Host mit Python ab 3.9, Docker CLI, `curl`, sudo/root und HTTPS-Zugriff auf GitHub. Die Befehle auf dem **Docker-Host** ausführen.
 
 **1. Skript im Home-Verzeichnis des Docker-Hosts herunterladen oder aktualisieren:**
 
@@ -111,7 +111,7 @@ sudo python3 update-daytracker.py --dry-run
 sudo python3 update-daytracker.py
 ```
 
-Das Skript zeigt den geplanten Ablauf und fragt vor Änderungen nach. Bei einer deaktivierten App fragt es zusätzlich nach der Aktivierung. **Wurde Daytracker durch das Update auf Nextcloud 34 deaktiviert, diese Aktivierungsfrage mit Ja beantworten.** Während des Updates wird Nextcloud vorübergehend in den Wartungsmodus versetzt.
+Das Skript erkennt automatisch, ob Daytracker bereits als `custom_app` vorhanden und registriert ist. Fehlt die App, führt es eine Erstinstallation aus. Es zeigt den geplanten Ablauf und fragt vor Änderungen nach. Bei einer neuen oder deaktivierten App fragt es zusätzlich nach der Aktivierung. **Wurde Daytracker durch das Update auf Nextcloud 34 deaktiviert, diese Aktivierungsfrage mit Ja beantworten.** Während des Vorgangs wird Nextcloud vorübergehend in den Wartungsmodus versetzt.
 
 Alternativ gezielt eine Version installieren:
 
@@ -133,19 +133,13 @@ Die [ausführliche Update-Anleitung](UPDATE.md) beschreibt Containernamen, unbea
 
 ### Erstinstallation der App
 
-Das Update-Skript setzt eine vorhandene Daytracker-Installation voraus. Für die Erstinstallation in einer bestehenden Nextcloud-AIO-Instanz:
-
-1. Das zur Nextcloud-Version passende [Release](https://github.com/rankerson/nextcloud_daytracker/releases) auswählen und das App-Archiv `daytracker-<VERSION>.tar.gz` sowie die zugehörige `.sha256`-Datei herunterladen. Version 3.0.3 unterstützt Nextcloud 33 und 34.
-2. Mit `sha256sum -c daytracker-<VERSION>.tar.gz.sha256` die Prüfsumme kontrollieren und das Archiv entpacken. Den Platzhalter durch die gewählte Versionsnummer ersetzen.
-3. Den vollständigen Ordner `daytracker/` nach `/var/www/html/custom_apps/daytracker` im Nextcloud-Container kopieren. Er enthält auch alle historischen Migrationen.
-4. Besitzer auf `www-data:www-data`, Verzeichnisrechte auf `750` und Dateirechte auf `640` setzen.
-5. Die App aktivieren; Nextcloud führt dabei die erforderlichen Migrationen aus:
+Eine manuelle Erstinstallation ist nicht erforderlich. Das Update-Skript lädt bei fehlendem `/var/www/html/custom_apps/daytracker` automatisch das Release, setzt Besitzer und Rechte und führt die Nextcloud-Installation aus. Für eine direkte Installation genügt:
 
 ```bash
-docker exec -u www-data nextcloud-aio-nextcloud php occ app:enable daytracker
+sudo python3 update-daytracker.py --enable
 ```
 
-Anschließend Daytracker im Browser öffnen. Besteht bereits eine Installation, den oben beschriebenen Updateablauf mit Sicherung verwenden.
+Ohne `--enable` bleibt die neu installierte App nach der Rückfrage deaktiviert. Version 3.0.3 unterstützt Nextcloud 33 und 34. Die manuelle Alternative über ein Release-Archiv ist weiterhin möglich, erfordert aber dieselben Prüfungen und `occ app:enable`-Schritte.
 
 ## Datenbankprüfung
 
