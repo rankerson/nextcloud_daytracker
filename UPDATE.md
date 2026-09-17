@@ -4,21 +4,59 @@
 
 ## Herunterladen und starten
 
-Auf dem Docker-Host ausführen:
+Die folgenden Befehle auf dem **Docker-Host** ausführen. Für den Download wird zusätzlich `curl` benötigt.
+
+**1. Skript herunterladen oder aktualisieren:**
 
 ```bash
 curl --fail --location --proto '=https' --proto-redir '=https' \
   https://raw.githubusercontent.com/rankerson/nextcloud_daytracker/main/update-daytracker.py \
   --output update-daytracker.py
+```
 
-# Neueste stabile Veröffentlichung laut GitHub "Latest":
+**2. Optional Download und Voraussetzungen prüfen, ohne den Server zu verändern:**
+
+```bash
+sudo python3 update-daytracker.py --dry-run
+```
+
+**3. Neueste stabile Veröffentlichung laut GitHub „Latest“ installieren:**
+
+```bash
 sudo python3 update-daytracker.py
+```
 
-# Alternativ eine bestimmte Version:
+Alternativ eine bestimmte Version installieren:
+
+```bash
 sudo python3 update-daytracker.py v3.0.3
 ```
 
-Das Skript ist bewusst als einzelne Python-Datei ausgeführt. Für spätere Updates genügt derselbe Aufruf; es lädt die App jeweils selbst von GitHub. Aktualisierungen am Skript selbst erhältst du durch erneutes Herunterladen. Die App-Archive enthalten das Host-Skript nicht.
+Das Skript ist als einzelne Python-Datei ausgeführt. Für spätere Updates genügt derselbe Aufruf; es lädt die App jeweils selbst von GitHub. Aktualisierungen am Skript selbst erhältst du durch erneutes Herunterladen. Die App-Archive enthalten das Host-Skript nicht.
+
+### Nach dem Update auf Nextcloud 34 deaktivierte App
+
+Beim normalen Aufruf die Frage nach der Aktivierung mit Ja beantworten und den angezeigten Updateablauf bestätigen. Das Skript ersetzt die alte App durch das ausgewählte kompatible Release und aktiviert sie nach den erforderlichen Migrationen.
+
+Ist dieses Release bereits installiert, wird der normale Aufruf ohne Änderung beendet. Für erneute Installation und Aktivierung verwenden:
+
+```bash
+sudo python3 update-daytracker.py --reinstall --enable
+```
+
+Nach erfolgreichem Abschluss Daytracker im Browser öffnen und mit `Strg + F5` vollständig neu laden. Zusätzliche manuelle `occ`- oder Migrationsbefehle sind nicht erforderlich.
+
+### Standardwerte
+
+| Einstellung | Standard |
+| --- | --- |
+| Zielversion | GitHub `latest` (stabile Veröffentlichung) |
+| Nextcloud-Container | `nextcloud-aio-nextcloud` |
+| PostgreSQL-Container | `nextcloud-aio-database` |
+| App-Verzeichnis im Container | `/var/www/html/custom_apps/daytracker` |
+| Sicherungsverzeichnis auf dem Host | `/var/backups/daytracker` |
+
+Andere Containernamen und den Sicherungsort über die unten beschriebenen Optionen angeben.
 
 ## Ablauf und Rückfragen
 

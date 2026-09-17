@@ -2,6 +2,8 @@
 
 Daytracker ist eine native Nextcloud-App zur benutzerbezogenen Erfassung von Tageswerten nach Kategorien und Zeitscheiben.
 
+Für Updates einer vorhandenen AIO-Installation: [Schnellstart](#bestehende-aio-installation-aktualisieren-empfohlen) oder [ausführliche Update-Anleitung](UPDATE.md).
+
 ## Update auf 3.0.3
 
 Nextcloud 34 wurde zuvor allein durch `max-version="33"` blockiert. Version 3.0.3 erlaubt Nextcloud 33–34. Die verwendeten Bootstrap-, Dashboard-, Datenbank- und HTTP-APIs wurden mit dem Nextcloud-34-Quellcode und dem [Upgrade-Leitfaden](https://docs.nextcloud.com/server/stable/developer_manual/release_notes/previous/upgrade_to_34.html) abgeglichen. Die App benötigt keine der dort entfernten Frontend-Bibliotheken. Automatisierte Integrationstests prüfen Installation, API und Browserfunktionen mit PostgreSQL auf Nextcloud 33 und 34.0.4; ein Test in deiner produktiven AIO-Instanz ist damit nicht ersetzt.
@@ -84,135 +86,67 @@ daytracker/
 
 ## Installation und Upgrade
 
-Für eine bestehende AIO-Installation übernimmt [update-daytracker.py](update-daytracker.py) den Download des neuesten Releases (oder einer gewählten Version), Prüfsumme, Sicherung, Rechte, Dateiaustausch, Migrationen und Neustart. Auf dem Docker-Host ausführen; die vollständige Anleitung und Fehlerbehandlung stehen in [UPDATE.md](UPDATE.md).
+### Bestehende AIO-Installation aktualisieren (empfohlen)
+
+[update-daytracker.py](update-daytracker.py) übernimmt Download, Prüfsumme, Sicherung, Rechte, Dateiaustausch, notwendige Migrationen und Neustart. Voraussetzung: eine bereits installierte Daytracker-App, Linux-Docker-Host mit Python ab 3.9, Docker CLI, `curl`, sudo/root und HTTPS-Zugriff auf GitHub. Die Befehle auf dem **Docker-Host** ausführen.
+
+**1. Skript herunterladen oder aktualisieren:**
 
 ```bash
-sudo python3 update-daytracker.py          # neuestes stabiles Release, mit Rückfragen
-sudo python3 update-daytracker.py v3.0.3   # bestimmte Version
+curl --fail --location --proto '=https' --proto-redir '=https' \
+  https://raw.githubusercontent.com/rankerson/nextcloud_daytracker/main/update-daytracker.py \
+  --output update-daytracker.py
 ```
 
-Die folgenden Schritte beschreiben die manuelle Alternative.
-
-### 1. Sicherung erstellen
-
-Vor dem Austausch der Dateien muss das produktive App-Verzeichnis gesichert werden:
+**2. Optional vorab prüfen, ohne den Server zu verändern:**
 
 ```bash
-docker exec -u root nextcloud-aio-nextcloud bash -lc '
-set -e
-stamp=$(date +%Y%m%d-%H%M%S)
-mkdir -p /var/www/daytracker-backups
-cp -a /var/www/html/custom_apps/daytracker "/var/www/daytracker-backups/daytracker-${stamp}"
-echo "Sicherung: /var/www/daytracker-backups/daytracker-${stamp}"
-'
+sudo python3 update-daytracker.py --dry-run
 ```
 
-Eine zusätzliche PostgreSQL-Sicherung entsprechend dem bestehenden AIO-Sicherungskonzept wird empfohlen, bevor produktive Dateien ersetzt werden.
-
-### 2. Release installieren
-
-Das vollständige Archiv [daytracker-3.0.3.tar.gz](https://github.com/rankerson/nextcloud_daytracker/releases/tag/v3.0.3) herunterladen und anhand der beigefügten SHA-256-Datei prüfen. Es enthält genau einen App-Ordner `daytracker/`; mehrere Pakete müssen nicht mehr zusammengeführt werden.
-
-Auf dem Docker-Host in ein leeres Arbeitsverzeichnis entpacken:
+**3. Neueste stabile Veröffentlichung installieren:**
 
 ```bash
-sha256sum -c daytracker-3.0.3.tar.gz.sha256
-tar -xzf daytracker-3.0.3.tar.gz
+sudo python3 update-daytracker.py
 ```
 
-Nach der Sicherung das vorhandene App-Verzeichnis durch den vollständigen neuen Ordner ersetzen. Die Sicherung außerhalb von `custom_apps/` aufbewahren, damit Nextcloud sie nicht als zweite App erkennt. Das Archiv enthält alle historischen Migrationen unter `lib/Migration/`.
+Das Skript zeigt den geplanten Ablauf und fragt vor Änderungen nach. Bei einer deaktivierten App fragt es zusätzlich nach der Aktivierung. **Wurde Daytracker durch das Update auf Nextcloud 34 deaktiviert, diese Aktivierungsfrage mit Ja beantworten.** Während des Updates wird Nextcloud vorübergehend in den Wartungsmodus versetzt.
 
-Zielpfad im AIO-Container:
-
-```text
-/var/www/html/custom_apps/daytracker
-```
-
-### 3. Rechte setzen
+Alternativ gezielt eine Version installieren:
 
 ```bash
-docker exec -u root nextcloud-aio-nextcloud chown -R www-data:www-data /var/www/html/custom_apps/daytracker
+sudo python3 update-daytracker.py v3.0.3
 ```
 
-Optional können die Verzeichnis- und Dateirechte normalisiert werden:
+Ohne Versionsangabe wird GitHubs `latest` verwendet. Ist die gewünschte Version bereits installiert, endet das Skript ohne Änderungen. Für eine erneute Installation samt Aktivierung:
 
 ```bash
-docker exec -u root nextcloud-aio-nextcloud bash -lc '
-find /var/www/html/custom_apps/daytracker -type d -exec chmod 750 {} \;
-find /var/www/html/custom_apps/daytracker -type f -exec chmod 640 {} \;
-'
+sudo python3 update-daytracker.py --reinstall --enable
 ```
 
-### 4. PHP-Syntax prüfen
+Sicherungen liegen standardmäßig auf dem Host unter `/var/backups/daytracker/`. Nach erfolgreichem Abschluss Daytracker im Browser öffnen und mit `Strg + F5` vollständig neu laden. Zusätzliche manuelle `occ`- oder Migrationsbefehle sind danach nicht erforderlich.
 
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud bash -lc '
-cd /var/www/html/custom_apps/daytracker
-find . -type f -name "*.php" -exec php -l {} \;
-'
-```
+Die [ausführliche Update-Anleitung](UPDATE.md) beschreibt Containernamen, unbeaufsichtigte Updates, Sicherungsumfang und Fehlerbehandlung. Für spätere Updates das Skript erneut herunterladen, um auch Verbesserungen am Updater zu erhalten.
 
-Jede Datei muss mit `No syntax errors detected` bestätigt werden. Bei einem Syntaxfehler darf das Upgrade nicht fortgesetzt werden.
+### Erstinstallation der App
 
-### 5. JavaScript-Syntax prüfen
+Das Update-Skript setzt eine vorhandene Daytracker-Installation voraus. Für die Erstinstallation in einer bestehenden Nextcloud-AIO-Instanz:
 
-Falls Node.js im Nextcloud-Container verfügbar ist:
-
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud bash -lc '
-cd /var/www/html/custom_apps/daytracker
-node --check js/main.js
-node --check js/dashboard.js
-'
-```
-
-Falls Node.js dort nicht verfügbar ist, müssen beide Dateien vor dem Upload lokal mit `node --check` geprüft werden.
-
-### 6. Upgrade ausführen
-
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud php occ upgrade
-```
-
-### 7. App-Status prüfen
-
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud php occ app:list | grep -A3 -B3 daytracker
-```
-
-Falls die App noch nicht aktiviert ist:
+1. Das zur Nextcloud-Version passende [Release](https://github.com/rankerson/nextcloud_daytracker/releases) auswählen und das App-Archiv `daytracker-<VERSION>.tar.gz` sowie die zugehörige `.sha256`-Datei herunterladen. Version 3.0.3 unterstützt Nextcloud 33 und 34.
+2. Mit `sha256sum -c daytracker-<VERSION>.tar.gz.sha256` die Prüfsumme kontrollieren und das Archiv entpacken. Den Platzhalter durch die gewählte Versionsnummer ersetzen.
+3. Den vollständigen Ordner `daytracker/` nach `/var/www/html/custom_apps/daytracker` im Nextcloud-Container kopieren. Er enthält auch alle historischen Migrationen.
+4. Besitzer auf `www-data:www-data`, Verzeichnisrechte auf `750` und Dateirechte auf `640` setzen.
+5. Die App aktivieren; Nextcloud führt dabei die erforderlichen Migrationen aus:
 
 ```bash
 docker exec -u www-data nextcloud-aio-nextcloud php occ app:enable daytracker
 ```
 
-### 8. Reparatur ausführen
-
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud php occ maintenance:repair
-```
-
-### 9. Container neu starten
-
-```bash
-docker restart nextcloud-aio-nextcloud
-```
-
-### 10. Browsercache aktualisieren
-
-Die Daytracker-Seite öffnen und anschließend einen vollständigen Browser-Reload ausführen:
-
-```text
-Strg + F5
-```
+Anschließend Daytracker im Browser öffnen. Besteht bereits eine Installation, den oben beschriebenen Updateablauf mit Sicherung verwenden.
 
 ## Datenbankprüfung
 
 ### Tabellen anzeigen
-
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud php occ db:convert-type --help >/dev/null
-```
 
 Für eine direkte Prüfung ist die PostgreSQL-Konsole des zugehörigen AIO-Datenbankcontainers zu verwenden. Containername und Zugangsdaten sind der eigenen AIO-Konfiguration zu entnehmen.
 
@@ -412,48 +346,13 @@ tail -n 200 /var/www/html/data/nextcloud.log
 '
 ```
 
-## Rückfallanleitung
+## Wiederherstellung nach einem fehlgeschlagenen Update
 
-### 1. App deaktivieren
+Das Skript meldet im Fehlerfall den Sicherungspfad. Dort stehen `update.log` und `RECOVERY.txt` für Diagnose und Wiederherstellung bereit. Vor Beginn möglicher Migrationen versucht es, die alten App-Dateien wiederherzustellen. Nach Beginn eines Upgrades oder einer Migration bleibt Nextcloud im Wartungsmodus; ein automatischer Rollback erfolgt dann nicht.
 
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud php occ app:disable daytracker
-```
+In diesem Fall zunächst den Fehler klären. Eine Wiederherstellung muss zusammenpassende App-Dateien, Konfiguration und Datenbank verwenden; nur alte App-Dateien zurückzukopieren genügt nach Datenbankänderungen nicht. App-Sicherungen außerhalb von `custom_apps/` aufbewahren, damit Nextcloud sie nicht als weitere App erkennt.
 
-### 2. Aktuellen Stand sichern
-
-```bash
-docker exec -u root nextcloud-aio-nextcloud bash -lc '
-stamp=$(date +%Y%m%d-%H%M%S)
-mv /var/www/html/custom_apps/daytracker "/var/www/html/custom_apps/daytracker.failed-${stamp}"
-'
-```
-
-### 3. Sicherung zurückkopieren
-
-Den zuvor erzeugten Sicherungspfad einsetzen:
-
-```bash
-docker exec -u root nextcloud-aio-nextcloud bash -lc '
-cp -a /var/www/daytracker-backups/daytracker-<ZEITSTEMPEL> /var/www/html/custom_apps/daytracker
-chown -R www-data:www-data /var/www/html/custom_apps/daytracker
-'
-```
-
-### 4. App wieder aktivieren
-
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud php occ app:enable daytracker
-```
-
-### 5. Reparatur und Neustart
-
-```bash
-docker exec -u www-data nextcloud-aio-nextcloud php occ maintenance:repair
-docker restart nextcloud-aio-nextcloud
-```
-
-Anschließend im Browser `Strg + F5` ausführen.
+Sicherungsumfang und Verhalten bei Abbrüchen sind unter [Sicherungen und Fehler](UPDATE.md#sicherungen-und-fehler) beschrieben.
 
 ## Sicherheitsmerkmale
 
