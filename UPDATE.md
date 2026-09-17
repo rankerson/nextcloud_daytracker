@@ -6,9 +6,10 @@
 
 Die folgenden Befehle auf dem **Docker-Host** ausführen. Für den Download wird zusätzlich `curl` benötigt.
 
-**1. Skript herunterladen oder aktualisieren:**
+**1. Skript im Home-Verzeichnis des Docker-Hosts herunterladen oder aktualisieren (nicht in `custom_apps`):**
 
 ```bash
+cd ~
 curl --fail --location --proto '=https' --proto-redir '=https' \
   https://raw.githubusercontent.com/rankerson/nextcloud_daytracker/main/update-daytracker.py \
   --output update-daytracker.py
@@ -64,13 +65,21 @@ Andere Containernamen und den Sicherungsort über die unten beschriebenen Option
 2. Gewünschtes GitHub-Release laden, SHA-256 kontrollieren, Archivinhalt und App-ID/Version sowie Nextcloud-/PHP-Kompatibilität prüfen. Downgrades und Vorabversionen werden abgelehnt.
 3. Zielversion, Container, Sicherungspfad und Wartungszeit anzeigen. Bei einer deaktivierten App fragen, ob sie anschließend aktiviert werden soll. Vor Beginn der Änderungen bestätigen lassen; Enter bedeutet Nein.
 4. Neue Dateien außerhalb des App-Verzeichnisses bereitstellen, PHP-Syntax prüfen und Besitzer/Rechte auf `www-data:www-data`, Verzeichnisse `750`, Dateien `640` setzen.
-5. Nextcloud in den Wartungsmodus setzen. Vor jedem Dateiaustausch die bisherige App, die Nextcloud-Konfiguration und einen vollständigen PostgreSQL-Dump sichern und die Sicherungen prüfen.
+5. Nextcloud in den Wartungsmodus setzen. Vor jedem Dateiaustausch die bisherige App, die Nextcloud-Konfiguration und gezielt die Daytracker-Datenbankobjekte sichern und die Sicherungen prüfen. Mit `--full-db-backup` zusätzlich einen vollständigen PostgreSQL-Dump erstellen.
 6. App-Verzeichnis vollständig austauschen; damit bleiben keine veralteten Dateien liegen. `occ upgrade` führt notwendige Updates und Migrationen aktiver Apps aus. Bei einer deaktivierten App führt `occ app:enable` die Installation und Migrationen des lokalen Pakets aus; auf Wunsch wird sie danach wieder deaktiviert. Bestehende Gruppenbeschränkungen einer aktiven App bleiben erhalten.
 7. Registrierte Version und Aktivierungsstatus prüfen, Nextcloud-Container neu starten und Bereitschaft prüfen. Abschließend den Wartungsmodus ausschalten. Im Browser vollständig neu laden.
 
 Alle `occ`-Befehle laufen als `www-data`. Historische Migrationen werden ausschließlich durch Nextcloud ausgeführt, nicht direkt per SQL oder `migration:execute`. Ein zusätzliches pauschales `maintenance:repair` ist nicht nötig; die App-Reparaturschritte gehören zum Nextcloud-Updateablauf. Der normale App-Store-Updater wird nicht aufgerufen.
 
 ## Optionen
+
+Standardmäßig werden nur die Daytracker-Daten gesichert. Für einen zusätzlichen vollständigen Nextcloud-Datenbankdump:
+
+```bash
+sudo python3 update-daytracker.py --full-db-backup
+```
+
+Die Auswahl wird vor der Bestätigung angezeigt und in `update.json` vermerkt. Sie gilt auch mit `--yes`; ohne `--full-db-backup` entsteht kein vollständiger Dump.
 
 ```bash
 # Nur prüfen und den Ablauf anzeigen; keine Änderungen im Container:
@@ -103,16 +112,84 @@ Standardmäßig entsteht pro Update ein nur für root zugänglicher Unterordner 
 
 - `app.tar.gz`: bisherige App inklusive veralteter Dateien für eine Wiederherstellung.
 - `config.tar.gz`: Nextcloud-Konfiguration, einschließlich Zugangsdaten; vertraulich aufbewahren.
-- `database.dump`: vollständige Nextcloud-PostgreSQL-Datenbank im `pg_dump`-Custom-Format.
+- `daytracker.dump`: alle Tabellen mit dem konfigurierten Präfix und `daytracker_` sowie ihre eigenen ID-Sequenzen; Schema, Daten, Indizes und Constraints im PostgreSQL-Custom-Format.
+- `daytracker-state.sql`: ausschließlich Daytracker-Zeilen aus `appconfig`, `migrations` und `preferences`, einschließlich Aktivierungsstatus und Initialisierungsmarkern.
+- `restore-daytracker.sql`: aus dem Dump erzeugte SQL-Datei plus App-Zustand zur gemeinsamen Rücksicherung in einer Transaktion.
+- `database.dump`: nur mit `--full-db-backup`; vollständige Nextcloud-PostgreSQL-Datenbank im Custom-Format.
 - `update.json`, `update.log`, `RECOVERY.txt`: Versionszuordnung, Befehlsausgaben und Hinweise zur Wiederherstellung.
 
-Die Sicherung enthält **keine Benutzerdateien** und ersetzt nicht das reguläre AIO-Backup. Für den Datenbankdump muss ausreichend Platz vorhanden sein. Alte Sicherungen werden nicht automatisch gelöscht.
+Die Sicherung enthält **keine Benutzerdateien** und ersetzt nicht das reguläre AIO-Backup. Die gezielte Sicherung setzt die Nextcloud-Tabellen im PostgreSQL-Schema `public` voraus und berücksichtigt das konfigurierte Tabellenpräfix. Für die Sicherungen muss ausreichend Platz vorhanden sein. Alte Sicherungen werden nicht automatisch gelöscht.
 
 Fehler bei Download, Prüfsumme oder Kompatibilität verändern die Installation nicht. Bei einem Fehler vor Beginn möglicher Migrationen versucht das Skript, die bisherigen App-Dateien wiederherzustellen und den selbst gesetzten Wartungsmodus auszuschalten. Ein fehlgeschlagener Sicherungsschritt verhindert den Dateiaustausch.
 
-Sobald eine Migration oder ein Upgrade gestartet wurde, erfolgt kein automatischer Rollback. Der Wartungsmodus bleibt aktiv; das Skript meldet Sicherungs- und Arbeitsverzeichnis. Erst den Fehler anhand der Protokolle klären. Falls eine Wiederherstellung nötig ist, müssen App-Dateien, Konfiguration und Datenbank zueinander passen. Die Wiederherstellung der vollständigen Datenbank betrifft auch andere Apps und gehört deshalb bewusst nicht zum automatischen Fehlerhandling.
+Sobald eine Migration oder ein Upgrade gestartet wurde, erfolgt kein automatischer Rollback. Der Wartungsmodus bleibt aktiv; das Skript meldet Sicherungs- und Arbeitsverzeichnis. Erst den Fehler anhand der Protokolle klären. Falls eine Wiederherstellung nötig ist, müssen App-Dateien und Daytracker-Datenbankzustand zueinander passen. Die gezielte Rücksicherung verändert keine Zeilen anderer Apps. Eine optionale vollständige Datenbankrücksicherung betrifft dagegen auch andere Apps. Beide werden nicht automatisch ausgelöst.
 
 Ein bereits aktiver Wartungsmodus oder ein vorher ausstehendes Upgrade führt zum Abbruch. Das Skript sperrt parallele eigene Updates desselben Containers auf diesem Host. AIO-Backups, Nextcloud-Serverupdates und manuelle App-Änderungen nicht gleichzeitig starten. Bei Stromausfall oder `kill -9` kann kein Skript aufräumen; in diesem Fall die verbliebenen Sicherungen/Arbeitsverzeichnisse prüfen, bevor der Wartungsmodus aufgehoben wird.
+
+## Gezielte Wiederherstellung
+
+Die Rücksicherung ist ein bewusster, manueller Schritt nach der Fehleranalyse. Sie setzt dieselbe Nextcloud-Version, dasselbe Tabellenpräfix und unveränderte Strukturen der gemeinsamen Nextcloud-Tabellen voraus. Alle seit der Sicherung erfolgten Daytracker-Änderungen werden verworfen. Andere Apps werden nicht zurückgesetzt. Nach fehlgeschlagenen Migrationen eventuell neu hinzugekommene Daytracker-Tabellen zuerst prüfen; die SQL-Datei ersetzt die gesicherten Tabellen, entfernt aber keine später hinzugekommenen Tabellen. Keine `CASCADE`-Löschungen verwenden.
+
+Auf dem Docker-Host eine Root-Bash öffnen (`sudo bash`). Die folgenden Schritte einzeln ausführen; bei einem Fehler stoppen und den Wartungsmodus beibehalten. Sicherungspfad und Containernamen anhand von `update.json` einsetzen:
+
+```bash
+backup=/var/backups/daytracker/DEINE-SICHERUNG
+nc=nextcloud-aio-nextcloud
+db=nextcloud-aio-database
+cat "$backup/update.json" "$backup/RECOVERY.txt"
+test -s "$backup/restore-daytracker.sql"
+tar -tzf "$backup/app.tar.gz" >/dev/null
+docker exec -u www-data "$nc" php occ maintenance:mode --on
+```
+
+Den alten App-Ordner außerhalb von `custom_apps` bereitstellen. Das Arbeitsverzeichnis und die bisherige Installation bleiben für die Fehleranalyse erhalten:
+
+```bash
+stage=$(docker exec "$nc" mktemp -d /var/www/html/.daytracker-restore-XXXXXXXX)
+docker cp "$backup/app.tar.gz" "$nc:$stage/app.tar.gz"
+docker exec "$nc" sh -ec '
+  test "$(stat -c %d "$1")" = "$(stat -c %d /var/www/html/custom_apps/daytracker)"
+  tar -xzf "$1/app.tar.gz" -C "$1"
+  test -f "$1/custom_apps/daytracker/appinfo/info.xml"
+' sh "$stage"
+```
+
+Daytracker-Datenbankzustand in einer Transaktion zurückspielen. Bei SQL-Fehlern wird die Transaktion nicht übernommen; der Fehler muss vor dem Dateiaustausch geklärt werden:
+
+```bash
+docker exec -i "$db" sh -ec '
+  export PGPASSWORD="${POSTGRES_PASSWORD:?}"
+  exec psql -X --username="${POSTGRES_USER:?}" --dbname="${POSTGRES_DB:?}" \
+    --single-transaction -v ON_ERROR_STOP=1 --file=-
+' < "$backup/restore-daytracker.sql"
+```
+
+Nach erfolgreicher SQL-Rücksicherung den App-Ordner vollständig ersetzen:
+
+```bash
+docker exec "$nc" sh -ec '
+  mv /var/www/html/custom_apps/daytracker "$1/failed"
+  mv "$1/custom_apps/daytracker" /var/www/html/custom_apps/daytracker
+  chown -R www-data:www-data /var/www/html/custom_apps/daytracker
+' sh "$stage"
+docker restart "$nc"
+```
+
+Warten, bis der Container bereit ist. Dann `occ status` und die registrierte App-Version prüfen:
+
+```bash
+docker exec -u www-data "$nc" php occ status
+docker exec -u www-data "$nc" php occ config:app:get daytracker installed_version
+docker exec -u www-data "$nc" php occ config:app:get daytracker enabled
+```
+
+Die Version muss `from` und der Aktivierungsstatus `enabled_before` aus `update.json` entsprechen. Erst wenn kein Upgrade mehr aussteht und die App-Dateien dazu passen, den Wartungsmodus ausschalten:
+
+```bash
+docker exec -u www-data "$nc" php occ maintenance:mode --off
+```
+
+Eine zuvor deaktivierte App bleibt deaktiviert. Insbesondere darf eine zurückgespielte alte, mit der aktuellen Nextcloud-Version inkompatible App nicht erzwungen aktiviert werden. `config.tar.gz` wird beim gezielten Rollback nicht pauschal zurückgespielt. Der optionale vollständige `database.dump` ist für diesen Ablauf nicht erforderlich.
 
 ## Automatische Prüfung
 

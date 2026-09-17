@@ -178,7 +178,60 @@ class Docker:
         text = self.occ("status", "--output=json")
         return json.loads(text[text.index("{"):])
 
-    def backup(self, directory):
+    def pg(self, program, *args, output=None, input_file=None):
+        return self.command("exec", "-i", self.database, "sh", "-ec",
+                            'export PGPASSWORD="${POSTGRES_PASSWORD:?}"; exec "$@" --username="${POSTGRES_USER:?}" --dbname="${POSTGRES_DB:?}"',
+                            "sh", program, *args, output=output, input_file=input_file)
+
+    def sql(self, query):
+        return self.pg("psql", "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c", query)
+
+    def backup_daytracker(self, directory):
+        prefix = self.occ("config:system:get", "dbtableprefix")
+        if not re.fullmatch(r"[a-zA-Z0-9_]*", prefix):
+            raise UpdateError("Nicht unterstütztes Datenbank-Tabellenpräfix.")
+        stem = prefix + "daytracker_"
+        tables = self.sql("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace "
+                          f"WHERE n.nspname='public' AND c.relkind='r' AND left(c.relname,{len(stem)})='{stem}' ORDER BY c.relname").splitlines()
+        if not {stem + name for name in ("categories", "options", "entries", "timeslices")} <= set(tables):
+            raise UpdateError("Daytracker-Tabellen fehlen im public-Schema; Sicherung abgebrochen.")
+        # Explicitly select owned sequences, including IDENTITY sequences.
+        sequences = self.sql("SELECT DISTINCT s.relname FROM pg_class s JOIN pg_namespace n ON n.oid=s.relnamespace "
+                             "JOIN pg_depend d ON d.objid=s.oid AND d.classid='pg_class'::regclass "
+                             "AND d.refclassid='pg_class'::regclass AND d.deptype IN ('a','i') "
+                             "JOIN pg_class t ON t.oid=d.refobjid "
+                             f"WHERE s.relkind='S' AND n.nspname='public' AND t.relnamespace=n.oid AND left(t.relname,{len(stem)})='{stem}' ORDER BY s.relname").splitlines()
+        def identifier(name):
+            return '"public"."' + name.replace('"', '""') + '"'
+        selection = [arg for name in tables + sequences for arg in ("--table", identifier(name))]
+        partial = directory / "daytracker.dump.partial"
+        with partial.open("xb") as output:
+            self.pg("pg_dump", "--format=custom", "--strict-names", *selection, output=output)
+        with partial.open("rb") as source, open(os.devnull, "wb") as output:
+            self.command("exec", "-i", self.database, "pg_restore", "--list", input_file=source, output=output)
+        partial.rename(directory / "daytracker.dump")
+        # Keep shared tables intact: save only this app's rows, including user initialization markers.
+        state = ["SET standard_conforming_strings = on;"]
+        for suffix, key in (("appconfig", "appid"), ("migrations", "app"), ("preferences", "appid")):
+            table = identifier(prefix + suffix)
+            rows = self.sql(f"SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM {table} t WHERE {key}='daytracker'")
+            # Validate the export before creating a recovery script.
+            if not isinstance(json.loads(rows), list):
+                raise UpdateError("Ungültiger Export des Daytracker-Konfigurationsstands.")
+            literal = rows.replace("'", "''")
+            state.extend((f"DELETE FROM {table} WHERE {key}='daytracker';",
+                          f"INSERT INTO {table} SELECT * FROM json_populate_recordset(NULL::{table}, '{literal}'::json);"))
+        (directory / "daytracker-state.sql").write_text("\n".join(state) + "\n", encoding="utf-8")
+        # Ready for psql --single-transaction: schema, rows, sequences and shared app state together.
+        partial = directory / "restore-daytracker.sql.partial"
+        with (directory / "daytracker.dump").open("rb") as source, partial.open("xb") as output:
+            self.command("exec", "-i", self.database, "pg_restore", "--file=-", "--clean", "--if-exists", "--no-owner", "--no-privileges",
+                         input_file=source, output=output)
+        with partial.open("ab") as output:
+            output.write(("\n" + "\n".join(state) + "\n").encode("utf-8"))
+        partial.rename(directory / "restore-daytracker.sql")
+
+    def backup(self, directory, *, full_database=False):
         for name, folder in (("app.tar.gz", "custom_apps/daytracker"), ("config.tar.gz", "config")):
             partial = directory / (name + ".partial")
             with partial.open("xb") as output:
@@ -187,6 +240,9 @@ class Docker:
                 if not archive.getmembers():
                     raise UpdateError("Dateisicherung ist leer.")
             partial.rename(directory / name)
+        self.backup_daytracker(directory)
+        if not full_database:
+            return
         partial = directory / "database.dump.partial"
         with partial.open("xb") as output:
             self.command("exec", self.database, "sh", "-ec",
@@ -251,19 +307,27 @@ class Updater:
         self.docker.log = self.backup_dir / "update.log"
         (self.backup_dir / "update.json").write_text(json.dumps({"from": current, "to": target, "sha256": digest,
             "container": self.args.container, "database_container": self.args.database_container, "enabled_before": enabled,
-            "app_path": APP, "stage": self.stage}, indent=2) + "\n", encoding="utf-8")
+            "app_path": APP, "stage": self.stage, "database_backup": "daytracker+full" if self.args.full_db_backup else "daytracker"}, indent=2) + "\n", encoding="utf-8")
         (self.backup_dir / "RECOVERY.txt").write_text(
-            "Diese Sicherung enthält App-Dateien, Nextcloud-Konfiguration und die GESAMTE Nextcloud-Datenbank.\n"
-            "Sie ist kein vollständiges AIO-/Nutzdaten-Backup.\n"
+            "Daytracker-Sicherung: App-Dateien, Tabellen mit Sequenzen sowie Daytracker-Zeilen aus appconfig, migrations und preferences.\n"
+            "restore-daytracker.sql enthält die gezielte Datenbank-Rücksicherung.\n"
+            "Im Wartungsmodus mit psql -X --single-transaction -v ON_ERROR_STOP=1 --file ausführen.\n"
+            "Danach app.tar.gz außerhalb von custom_apps entpacken und den App-Ordner vollständig austauschen.\n"
+            "Nur auf derselben Nextcloud-Version und demselben Datenbank-Schema wiederherstellen.\n"
+            "Nach Migrationen neu hinzugekommene Daytracker-Tabellen vor einem Rollback gesondert prüfen.\n"
+            "Keine CASCADE-Löschungen durchführen. Bei SQL-Fehlern bleibt die Transaktion ohne Übernahme.\n"
+            "config.tar.gz ist eine zusätzliche Sicherung; beim Daytracker-Rollback nicht pauschal zurückspielen.\n"
+            "Nur abgeschlossene Archive verwenden; .partial-Dateien sind keine geprüften Sicherungen.\n"
             "Nach begonnenen Migrationen NICHT nur alte App-Dateien zurückkopieren.\n"
-            "Nextcloud im Wartungsmodus lassen und den Fehler anhand des Updater-Logs und nextcloud.log klären.\n"
-            "Bei nötiger Wiederherstellung App/Config und Datenbank gemeinsam durch einen Administrator wiederherstellen.\n"
-            "database.dump ist ein pg_dump-Custom-Archiv für pg_restore; dessen Wiederherstellung betrifft alle Apps.\n"
-            "Keine automatische Datenbankwiederherstellung; keine Passwörter in Befehlszeilen kopieren.\n", encoding="utf-8")
+            "Nextcloud im Wartungsmodus lassen und Fehler anhand der Logs klären.\n"
+            "Keine automatische Datenbankwiederherstellung. Anleitung: UPDATE.md, Gezielte Wiederherstellung.\n"
+            + ("Zusätzlich: database.dump enthält die GESAMTE Nextcloud-Datenbank; Rücksicherung betrifft alle Apps.\n"
+               if self.args.full_db_backup else "Kein vollständiger Nextcloud-Datenbankdump angefordert.\n"),
+            encoding="utf-8")
         self.maintenance = True  # Also recover if the command is interrupted after changing config.
         print("Wartungsmodus einschalten und Sicherung erstellen …", flush=True)
         self.docker.occ("maintenance:mode", "--on")
-        self.docker.backup(self.backup_dir)
+        self.docker.backup(self.backup_dir, full_database=self.args.full_db_backup)
         print(f"Sicherung abgeschlossen: {self.backup_dir}", flush=True)
         self.exchange_started = True
         self.docker.shell('mv "$1" "$2/previous"; mv "$2/daytracker" "$1"', APP, self.stage)
@@ -336,6 +400,7 @@ def arguments(argv=None):
     parser.add_argument("--container", default="nextcloud-aio-nextcloud")
     parser.add_argument("--database-container", default="nextcloud-aio-database")
     parser.add_argument("--backup-dir", default="/var/backups/daytracker", help="Sicherungen auf dem Docker-Host")
+    parser.add_argument("--full-db-backup", action="store_true", help="zusätzlich zur Daytracker-Sicherung die gesamte Nextcloud-Datenbank sichern")
     parser.add_argument("--yes", action="store_true", help="Update ohne Rückfrage; deaktivierte App bleibt ohne --enable deaktiviert")
     parser.add_argument("--enable", action="store_true", help="eine bisher deaktivierte App nach dem Update aktivieren")
     parser.add_argument("--reinstall", action="store_true", help="gleiche Version erneut installieren")
@@ -380,7 +445,8 @@ def main(argv=None):
                 return 0
             print(f"Container: {args.container}; PostgreSQL: {args.database_container}\nSicherungen auf dem Host: {Path(args.backup_dir).resolve()}\n"
                   "Die gesamte Nextcloud wird für Sicherung, Dateiaustausch und Migrationen in den Wartungsmodus versetzt.\n"
-                  "Die Datenbanksicherung umfasst die gesamte Nextcloud-Datenbank, keine Benutzerdateien.\n"
+                  "Sicherung: Daytracker-Tabellen, ID-Sequenzen, App-Konfiguration, Migrationen und Benutzereinstellungen; keine Benutzerdateien.\n"
+                  + ("Zusätzlich wird die gesamte Nextcloud-Datenbank gesichert.\n" if args.full_db_backup else "Kein vollständiger Nextcloud-Datenbankdump.\n")
                   + ("Container-Neustart wird übersprungen." if args.no_restart else "Der Nextcloud-Container wird danach neu gestartet."))
             if args.dry_run:
                 print("Prüflauf erfolgreich; keine Serveränderungen.")

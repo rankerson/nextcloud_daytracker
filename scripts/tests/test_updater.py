@@ -76,13 +76,57 @@ class FakeDocker:
             return self.installed if args[2] == "installed_version" else self.enabled
         return "OK"
 
-    def backup(self, directory):
+    def backup(self, directory, *, full_database=False):
         self.calls.append(("backup",))
         if self.failure == "backup":
             raise u.UpdateError("disk full")
 
 
 class UpdaterTests(unittest.TestCase):
+    def test_scoped_backup_includes_sequences_and_only_app_state(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            docker = u.Docker("nextcloud", "db")
+            queries, commands = [], []
+
+            def sql(query):
+                queries.append(query)
+                if "c.relname" in query:
+                    return "\n".join("nc_daytracker_" + name for name in ("categories", "entries", "options", "timeslices"))
+                if "s.relname" in query:
+                    return "nc_daytracker_entries_id_seq"
+                return json.dumps([{"appid": "daytracker", "configvalue": "O'Brien\\test\nvalue"}])
+
+            def command(*args, output=None, input_file=None):
+                commands.append(args)
+                if output:
+                    output.write(b"-- dump\n")
+                return ""
+
+            with patch.object(docker, "occ", return_value="nc_"), patch.object(docker, "sql", side_effect=sql), patch.object(docker, "command", side_effect=command):
+                docker.backup_daytracker(root)
+            dump = next(call for call in commands if "pg_dump" in call)
+            self.assertIn('"public"."nc_daytracker_entries_id_seq"', dump)
+            self.assertNotIn('"public"."nc_appconfig"', dump)
+            state = (root / "daytracker-state.sql").read_text(encoding="utf-8")
+            self.assertIn("O''Brien", state)
+            self.assertEqual(state.count("DELETE FROM"), 3)
+            self.assertIn("WHERE app='daytracker'", state)
+            self.assertEqual(state.count("WHERE appid='daytracker'"), 2)
+            self.assertIn(state, (root / "restore-daytracker.sql").read_text(encoding="utf-8"))
+
+    def test_missing_tables_abort_backup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            docker = u.Docker("nextcloud", "db")
+            with patch.object(docker, "occ", return_value="oc_"), patch.object(docker, "sql", return_value="oc_daytracker_entries"), patch.object(docker, "command") as command:
+                with self.assertRaises(u.UpdateError):
+                    docker.backup_daytracker(Path(temp))
+                command.assert_not_called()
+
+    def test_full_database_backup_is_opt_in(self):
+        self.assertFalse(u.arguments([]).full_db_backup)
+        self.assertTrue(u.arguments(["--full-db-backup"]).full_db_backup)
+
     def test_versions_and_major_bounds(self):
         import xml.etree.ElementTree as ET
         dep = ET.fromstring('<nextcloud min-version="33" max-version="34"/>')
@@ -153,7 +197,7 @@ class UpdaterTests(unittest.TestCase):
 
     def transaction(self, root, failure=None, enabled="yes", enable=False):
         docker = FakeDocker(failure, enabled)
-        args = argparse.Namespace(backup_dir=root, container="nextcloud-test", database_container="db", no_restart=False, enable=enable)
+        args = argparse.Namespace(backup_dir=root, container="nextcloud-test", database_container="db", no_restart=False, enable=enable, full_db_backup=False)
         return u.Updater(docker, args), docker
 
     def test_success_preserves_active_and_disabled_state(self):

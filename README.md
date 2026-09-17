@@ -90,9 +90,10 @@ daytracker/
 
 [update-daytracker.py](update-daytracker.py) übernimmt Download, Prüfsumme, Sicherung, Rechte, Dateiaustausch, notwendige Migrationen und Neustart. Voraussetzung: eine bereits installierte Daytracker-App, Linux-Docker-Host mit Python ab 3.9, Docker CLI, `curl`, sudo/root und HTTPS-Zugriff auf GitHub. Die Befehle auf dem **Docker-Host** ausführen.
 
-**1. Skript herunterladen oder aktualisieren:**
+**1. Skript im Home-Verzeichnis des Docker-Hosts herunterladen oder aktualisieren:**
 
 ```bash
+cd ~
 curl --fail --location --proto '=https' --proto-redir '=https' \
   https://raw.githubusercontent.com/rankerson/nextcloud_daytracker/main/update-daytracker.py \
   --output update-daytracker.py
@@ -123,6 +124,8 @@ Ohne Versionsangabe wird GitHubs `latest` verwendet. Ist die gewünschte Version
 ```bash
 sudo python3 update-daytracker.py --reinstall --enable
 ```
+
+Standardmäßig sichert das Skript nur die Daytracker-Tabellen samt ID-Sequenzen, App-Konfiguration, Migrationsstand und Benutzereinstellungen sowie die App-Dateien und Nextcloud-Konfigurationsdateien. Mit `--full-db-backup` wird zusätzlich die gesamte Nextcloud-Datenbank gesichert.
 
 Sicherungen liegen standardmäßig auf dem Host unter `/var/backups/daytracker/`. Nach erfolgreichem Abschluss Daytracker im Browser öffnen und mit `Strg + F5` vollständig neu laden. Zusätzliche manuelle `occ`- oder Migrationsbefehle sind danach nicht erforderlich.
 
@@ -350,7 +353,7 @@ tail -n 200 /var/www/html/data/nextcloud.log
 
 Das Skript meldet im Fehlerfall den Sicherungspfad. Dort stehen `update.log` und `RECOVERY.txt` für Diagnose und Wiederherstellung bereit. Vor Beginn möglicher Migrationen versucht es, die alten App-Dateien wiederherzustellen. Nach Beginn eines Upgrades oder einer Migration bleibt Nextcloud im Wartungsmodus; ein automatischer Rollback erfolgt dann nicht.
 
-In diesem Fall zunächst den Fehler klären. Eine Wiederherstellung muss zusammenpassende App-Dateien, Konfiguration und Datenbank verwenden; nur alte App-Dateien zurückzukopieren genügt nach Datenbankänderungen nicht. App-Sicherungen außerhalb von `custom_apps/` aufbewahren, damit Nextcloud sie nicht als weitere App erkennt.
+In diesem Fall zunächst den Fehler klären. Eine Wiederherstellung muss zusammenpassende App-Dateien und Daytracker-Datenbankzustände verwenden; nur alte App-Dateien zurückzukopieren genügt nach Datenbankänderungen nicht. App-Sicherungen außerhalb von `custom_apps/` aufbewahren, damit Nextcloud sie nicht als weitere App erkennt.
 
 Sicherungsumfang und Verhalten bei Abbrüchen sind unter [Sicherungen und Fehler](UPDATE.md#sicherungen-und-fehler) beschrieben.
 
