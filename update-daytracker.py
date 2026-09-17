@@ -240,6 +240,8 @@ class Updater:
         if not re.fullmatch(r"/var/www/html/\.daytracker-update-[A-Za-z0-9]+", self.stage):
             self.stage = None
             raise UpdateError("Unerwarteter temporärer Containerpfad.")
+        # mv must rename, never fall back to a partial cross-filesystem copy.
+        self.docker.shell('test "$(stat -c %d "$1")" = "$(stat -c %d "$2")"', APP, self.stage)
         self.docker.command("cp", str(app), self.args.container + ":" + self.stage + "/daytracker")
         self.docker.shell('chown -R www-data:www-data "$1"; find "$1" -type d -exec chmod 750 {} +; find "$1" -type f -exec chmod 640 {} +', self.stage + "/daytracker")
         self.docker.shell('find "$1" -name "*.php" -type f -exec sh -ec \'for f do php -l "$f" >/dev/null || exit 1; done\' sh {} +', self.stage + "/daytracker")

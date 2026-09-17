@@ -75,3 +75,7 @@ Fehler bei Download, Prüfsumme oder Kompatibilität verändern die Installation
 Sobald eine Migration oder ein Upgrade gestartet wurde, erfolgt kein automatischer Rollback. Der Wartungsmodus bleibt aktiv; das Skript meldet Sicherungs- und Arbeitsverzeichnis. Erst den Fehler anhand der Protokolle klären. Falls eine Wiederherstellung nötig ist, müssen App-Dateien, Konfiguration und Datenbank zueinander passen. Die Wiederherstellung der vollständigen Datenbank betrifft auch andere Apps und gehört deshalb bewusst nicht zum automatischen Fehlerhandling.
 
 Ein bereits aktiver Wartungsmodus oder ein vorher ausstehendes Upgrade führt zum Abbruch. Das Skript sperrt parallele eigene Updates desselben Containers auf diesem Host. AIO-Backups, Nextcloud-Serverupdates und manuelle App-Änderungen nicht gleichzeitig starten. Bei Stromausfall oder `kill -9` kann kein Skript aufräumen; in diesem Fall die verbliebenen Sicherungen/Arbeitsverzeichnisse prüfen, bevor der Wartungsmodus aufgehoben wird.
+
+## Automatische Prüfung
+
+Der GitHub-Workflow **Test AIO updater** prüft Offline-Fehlerfälle und führt echte Updates von Daytracker 3.0.2 auf 3.0.3 in separaten Nextcloud-33- und Nextcloud-34.0.4-Containern mit PostgreSQL durch. Er prüft vorhandene Datensätze, Sicherungsarchive, Rechte, Neustart, Auswahl von `latest` beziehungsweise einer konkreten Version und den Aktivierungszustand. Das sind isolierte Docker-Tests; die individuelle produktive AIO-Installation wird dabei nicht angefasst.

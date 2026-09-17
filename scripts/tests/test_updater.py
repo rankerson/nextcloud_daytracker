@@ -41,6 +41,8 @@ class FakeDocker:
         self.calls.append(("shell", script))
         if script.startswith("mktemp"):
             return "/var/www/html/.daytracker-update-test123"
+        if script.startswith('test "$(stat -c %d') and self.failure == "filesystem":
+            raise u.UpdateError("different filesystems")
         if script.startswith('mv "$1"'):
             self.swapped = True
             if self.failure == "swap":
@@ -174,6 +176,16 @@ class UpdaterTests(unittest.TestCase):
                 self.assertFalse(docker.swapped)
                 self.assertFalse(docker.maintenance)
                 self.assertEqual(docker.installed, "3.0.2")
+
+    def test_cross_filesystem_exchange_refused_before_maintenance(self):
+        with tempfile.TemporaryDirectory() as temp:
+            updater, docker = self.transaction(temp, failure="filesystem")
+            with self.assertRaises(u.UpdateError):
+                updater.perform(Path(temp), "3.0.3", "3.0.2", "yes", "0" * 64)
+            updater.recover()
+            self.assertFalse(docker.swapped)
+            self.assertNotIn(("backup",), docker.calls)
+            self.assertNotIn(("maintenance:mode", "--on"), docker.calls)
 
     def test_migration_or_restart_failure_keeps_maintenance_and_new_files(self):
         for failure in ("migration", "restart"):
