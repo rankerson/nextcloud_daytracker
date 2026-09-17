@@ -1,0 +1,30 @@
+name: Publish historical releases
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/historical-releases.yml
+      - scripts/publish_historical_releases.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: historical-releases
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download publisher from this commit
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: curl --fail --silent --show-error --location "https://raw.githubusercontent.com/rankerson/nextcloud_daytracker/${COMMIT_SHA}/scripts/publish_historical_releases.py" --output publish.py
+      - name: Verify snapshots and publish releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 publish.py
