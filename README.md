@@ -6,11 +6,11 @@ Für Updates einer vorhandenen AIO-Installation: [Schnellstart](#bestehende-aio-
 
 ## Update auf 3.0.4
 
-Nextcloud 35 wurde zuvor allein durch `max-version="33"` blockiert. Version 3.0.4 erlaubt Nextcloud 33–35. Die verwendeten Bootstrap-, Dashboard-, Datenbank- und HTTP-APIs wurden mit dem Nextcloud-34-Quellcode und dem [Upgrade-Leitfaden](https://docs.nextcloud.com/server/stable/developer_manual/release_notes/previous/upgrade_to_34.html) abgeglichen. Die App benötigt keine der dort entfernten Frontend-Bibliotheken. Automatisierte Integrationstests prüfen Installation, API und Browserfunktionen mit PostgreSQL auf Nextcloud 33, 34 und 35.0.4; ein Test in deiner produktiven AIO-Instanz ist damit nicht ersetzt.
+Nextcloud 35 wurde bislang durch `max-version="34"` blockiert. Version 3.0.4 erlaubt Nextcloud 33–35. Die verwendeten Bootstrap-, Dashboard-, Datenbank- und HTTP-APIs wurden mit dem Nextcloud-35-Quellcode und dem [Upgrade-Leitfaden](https://docs.nextcloud.com/server/stable/developer_manual/release_notes/previous/upgrade_to_35.html) abgeglichen. Die verwendeten APIs sind weiterhin vorhanden. Automatisierte Integrationstests prüfen Installation, API und Browserfunktionen mit PostgreSQL auf Nextcloud 33, 34.0.4 und 35.0.2; ein Test in deiner produktiven AIO-Instanz ist damit nicht ersetzt.
 
 ## Zielumgebung
 
-- Nextcloud 33, 34 oder 35 (einschließlich 34.0.4 und 35.0.2)
+- Nextcloud 33 bis 35 (einschließlich 34.0.4 und 35.0.2)
 - Nextcloud AIO
 - PHP 8.2 oder höher (zusätzlich gelten die Anforderungen der Nextcloud-Version)
 - PostgreSQL
