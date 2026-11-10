@@ -429,7 +429,7 @@ class Updater:
 
 def arguments(argv=None):
     parser = argparse.ArgumentParser(description="Daytracker auf dem Linux-AIO-Docker-Host aktualisieren. Ohne Version: neuestes stabiles GitHub-Release.")
-    parser.add_argument("version", nargs="?", default="latest", help="latest, 3.0.3 oder v3.0.3; keine Downgrades")
+    parser.add_argument("version", nargs="?", default="latest", help="latest, 3.0.4 oder v3.0.4; keine Downgrades")
     parser.add_argument("--container", default="nextcloud-aio-nextcloud")
     parser.add_argument("--database-container", default="nextcloud-aio-database")
     parser.add_argument("--backup-dir", default="/var/backups/daytracker", help="Sicherungen auf dem Docker-Host")

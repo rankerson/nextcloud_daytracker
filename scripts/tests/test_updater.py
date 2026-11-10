@@ -17,7 +17,7 @@ spec.loader.exec_module(u)
 
 
 def archive(path, extra=None):
-    info = b'<info><id>daytracker</id><version>3.0.3</version><dependencies><php min-version="8.2"/><nextcloud min-version="33" max-version="34"/><database>pgsql</database></dependencies></info>'
+    info = b'<info><id>daytracker</id><version>3.0.4</version><dependencies><php min-version="8.2"/><nextcloud min-version="33" max-version="999"/><database>pgsql</database></dependencies></info>'
     with tarfile.open(path, "w:gz") as tar:
         for name, data in {"daytracker/appinfo/info.xml": info, "daytracker/appinfo/routes.php": b"<?php",
                            "daytracker/lib/AppInfo/Application.php": b"<?php", "daytracker/templates/main.php": b"<?php"}.items():
@@ -58,7 +58,7 @@ class FakeDocker:
         return ""
 
     def status(self):
-        return {"installed": True, "needsDbUpgrade": self.installed != "3.0.3", "maintenance": self.maintenance}
+        return {"installed": True, "needsDbUpgrade": self.installed != "3.0.4", "maintenance": self.maintenance}
 
     def occ(self, *args):
         self.calls.append(args)
@@ -67,7 +67,7 @@ class FakeDocker:
         if args[0] in ("upgrade", "app:enable"):
             if self.failure == "migration":
                 raise u.UpdateError("migration failed")
-            self.installed = "3.0.3"
+            self.installed = "3.0.4"
         if args[0] == "app:enable":
             self.enabled = "yes"
         if args[0] == "app:disable":
@@ -86,8 +86,8 @@ class UpdaterTests(unittest.TestCase):
     def test_initial_install_uses_app_enable_without_existing_app_backup(self):
         with tempfile.TemporaryDirectory() as temp:
             updater, docker = self.transaction(temp, enabled="no")
-            updater.perform(Path(temp), "3.0.3", None, "no", "0" * 64, False, False)
-            self.assertEqual(docker.installed, "3.0.3")
+            updater.perform(Path(temp), "3.0.4", None, "no", "0" * 64, False, False)
+            self.assertEqual(docker.installed, "3.0.4")
             self.assertEqual(docker.enabled, "no")
             self.assertTrue(any(call[0] == "backup" for call in docker.calls))
             self.assertTrue(any(call[0] == "app:enable" for call in docker.calls))
@@ -138,12 +138,13 @@ class UpdaterTests(unittest.TestCase):
 
     def test_versions_and_major_bounds(self):
         import xml.etree.ElementTree as ET
-        dep = ET.fromstring('<nextcloud min-version="33" max-version="34"/>')
+        dep = ET.fromstring('<nextcloud min-version="33" max-version="35"/>')
         self.assertTrue(u.compatible("34.0.4", dep))
-        self.assertFalse(u.compatible("35.0.0", dep))
+        self.assertTrue(u.compatible("35.0.2", dep))
+        self.assertFalse(u.compatible("36.0.0", dep))
         self.assertFalse(u.compatible("32.0.9", dep))
         self.assertGreater(u.version_tuple("3.0.10"), u.version_tuple("3.0.9"))
-        for value in ("3.0.3;id", "../3.0.3", "3.0.3-rc1", "03.0.3"):
+        for value in ("3.0.4;id", "../3.0.4", "3.0.4-rc1", "03.0.4"):
             with self.assertRaises(u.UpdateError):
                 u.version_tuple(value)
 
@@ -160,7 +161,7 @@ class UpdaterTests(unittest.TestCase):
                     u.unpack(root / "app.tar.gz", root / "out")
                 self.assertFalse((root / "out").exists())
 
-    def release_fixture(self, root, checksum_bad=False, target="3.0.3"):
+    def release_fixture(self, root, checksum_bad=False, target="3.0.4"):
         bundle = root / "fixture.tar.gz"
         archive(bundle)
         content = bundle.read_bytes()
@@ -180,16 +181,16 @@ class UpdaterTests(unittest.TestCase):
         return fake_download
 
     def test_latest_and_explicit_version(self):
-        for requested in ("latest", "3.0.3"):
+        for requested in ("latest", "3.0.4"):
             with self.subTest(requested=requested), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
                 with patch.object(u, "download", self.release_fixture(root)):
-                    target, app, digest = u.prepare_release(requested, root, "3.0.2", "34.0.4", "8.5.0")
-                    self.assertEqual(target, "3.0.3")
+                    target, app, digest = u.prepare_release(requested, root, "3.0.2", "35.0.2", "8.5.0")
+                    self.assertEqual(target, "3.0.4")
                     self.assertTrue((app / "appinfo/info.xml").exists())
 
     def test_checksum_and_incompatible_server_rejected(self):
-        for bad_checksum, server in ((True, "34.0.4"), (False, "35.0.0")):
+        for bad_checksum, server in ((True, "34.0.4"), (False, "32.0.9")):
             with self.subTest(checksum=bad_checksum), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
                 with patch.object(u, "download", self.release_fixture(root, checksum_bad=bad_checksum)):
@@ -202,7 +203,7 @@ class UpdaterTests(unittest.TestCase):
             with patch.object(u, "download", self.release_fixture(root)):
                 with self.assertRaisesRegex(u.UpdateError, "Downgrade"):
                     u.prepare_release("latest", root, "3.0.10", "34.0.4", "8.5.0")
-            self.assertFalse((root / "daytracker-3.0.3.tar.gz").exists())
+            self.assertFalse((root / "daytracker-3.0.4.tar.gz").exists())
 
     def transaction(self, root, failure=None, enabled="yes", enable=False):
         docker = FakeDocker(failure, enabled)
@@ -213,9 +214,9 @@ class UpdaterTests(unittest.TestCase):
         for enabled, enable in (("yes", False), ("no", False), ("no", True), ('["team"]', False)):
             with self.subTest(enabled=enabled, enable=enable), tempfile.TemporaryDirectory() as temp:
                 updater, docker = self.transaction(temp, enabled=enabled, enable=enable)
-                updater.perform(Path(temp), "3.0.3", "3.0.2", enabled, "0" * 64, True, True)
+                updater.perform(Path(temp), "3.0.4", "3.0.2", enabled, "0" * 64, True, True)
                 self.assertFalse(docker.maintenance)
-                self.assertEqual(docker.installed, "3.0.3")
+                self.assertEqual(docker.installed, "3.0.4")
                 self.assertEqual(docker.enabled, "yes" if enable else enabled)
                 self.assertLess(docker.calls.index(("backup",)), next(i for i, call in enumerate(docker.calls) if call[0] == "shell" and call[1].startswith('mv "$1"')))
 
@@ -224,7 +225,7 @@ class UpdaterTests(unittest.TestCase):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temp:
                 updater, docker = self.transaction(temp, failure=failure)
                 with self.assertRaises(u.UpdateError):
-                    updater.perform(Path(temp), "3.0.3", "3.0.2", "yes", "0" * 64, True, True)
+                    updater.perform(Path(temp), "3.0.4", "3.0.2", "yes", "0" * 64, True, True)
                 updater.recover()
                 self.assertFalse(docker.swapped)
                 self.assertFalse(docker.maintenance)
@@ -234,7 +235,7 @@ class UpdaterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             updater, docker = self.transaction(temp, failure="filesystem")
             with self.assertRaises(u.UpdateError):
-                updater.perform(Path(temp), "3.0.3", "3.0.2", "yes", "0" * 64, True, True)
+                updater.perform(Path(temp), "3.0.4", "3.0.2", "yes", "0" * 64, True, True)
             updater.recover()
             self.assertFalse(docker.swapped)
             self.assertNotIn(("backup",), docker.calls)
@@ -245,7 +246,7 @@ class UpdaterTests(unittest.TestCase):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temp:
                 updater, docker = self.transaction(temp, failure=failure)
                 with self.assertRaises(u.UpdateError):
-                    updater.perform(Path(temp), "3.0.3", "3.0.2", "yes", "0" * 64, True, True)
+                    updater.perform(Path(temp), "3.0.4", "3.0.2", "yes", "0" * 64, True, True)
                 updater.recover()
                 self.assertTrue(docker.swapped)
                 self.assertTrue(docker.maintenance)

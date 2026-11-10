@@ -32,7 +32,7 @@ def data():
 def main():
     command = ["sudo", "python3", "update-daytracker.py", "--container", "nextcloud", "--database-container", "db",
                "--backup-dir", "/var/backups/daytracker-ci"]
-    requested = ["v3.0.3"] if os.environ["NC_VERSION"] == "33" else []
+    requested = ["v3.0.3"]
     before = occ("config:app:get", "daytracker", "installed_version")
     assert before == "3.0.2"
     assert data() == "Daten bleiben erhalten"

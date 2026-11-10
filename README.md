@@ -1,16 +1,16 @@
-# Daytracker für Nextcloud 33 und 34
+# Daytracker für Nextcloud 33, 34 und 35
 
 Daytracker ist eine native Nextcloud-App zur benutzerbezogenen Erfassung von Tageswerten nach Kategorien und Zeitscheiben.
 
 Für Updates einer vorhandenen AIO-Installation: [Schnellstart](#bestehende-aio-installation-aktualisieren-empfohlen) oder [ausführliche Update-Anleitung](UPDATE.md).
 
-## Update auf 3.0.3
+## Update auf 3.0.4
 
-Nextcloud 34 wurde zuvor allein durch `max-version="33"` blockiert. Version 3.0.3 erlaubt Nextcloud 33–34. Die verwendeten Bootstrap-, Dashboard-, Datenbank- und HTTP-APIs wurden mit dem Nextcloud-34-Quellcode und dem [Upgrade-Leitfaden](https://docs.nextcloud.com/server/stable/developer_manual/release_notes/previous/upgrade_to_34.html) abgeglichen. Die App benötigt keine der dort entfernten Frontend-Bibliotheken. Automatisierte Integrationstests prüfen Installation, API und Browserfunktionen mit PostgreSQL auf Nextcloud 33 und 34.0.4; ein Test in deiner produktiven AIO-Instanz ist damit nicht ersetzt.
+Nextcloud 35 wurde bislang durch `max-version="34"` blockiert. Version 3.0.4 erlaubt Nextcloud 33–35. Die verwendeten Bootstrap-, Dashboard-, Datenbank- und HTTP-APIs wurden mit dem Nextcloud-35-Quellcode und dem [Upgrade-Leitfaden](https://docs.nextcloud.com/server/stable/developer_manual/release_notes/previous/upgrade_to_35.html) abgeglichen. Die verwendeten APIs sind weiterhin vorhanden. Automatisierte Integrationstests prüfen Installation, API und Browserfunktionen mit PostgreSQL auf Nextcloud 33, 34.0.4 und 35.0.2; ein Test in deiner produktiven AIO-Instanz ist damit nicht ersetzt.
 
 ## Zielumgebung
 
-- Nextcloud 33 oder 34 (einschließlich 34.0.4)
+- Nextcloud 33 bis 35 (einschließlich 34.0.4 und 35.0.2)
 - Nextcloud AIO
 - PHP 8.2 oder höher (zusätzlich gelten die Anforderungen der Nextcloud-Version)
 - PostgreSQL
@@ -111,12 +111,12 @@ sudo python3 update-daytracker.py --dry-run
 sudo python3 update-daytracker.py
 ```
 
-Das Skript erkennt automatisch, ob Daytracker bereits als `custom_app` vorhanden und registriert ist. Fehlt die App, führt es eine Erstinstallation aus. Es zeigt den geplanten Ablauf und fragt vor Änderungen nach. Bei einer neuen oder deaktivierten App fragt es zusätzlich nach der Aktivierung. **Wurde Daytracker durch das Update auf Nextcloud 34 deaktiviert, diese Aktivierungsfrage mit Ja beantworten.** Während des Vorgangs wird Nextcloud vorübergehend in den Wartungsmodus versetzt.
+Das Skript erkennt automatisch, ob Daytracker bereits als `custom_app` vorhanden und registriert ist. Fehlt die App, führt es eine Erstinstallation aus. Es zeigt den geplanten Ablauf und fragt vor Änderungen nach. Bei einer neuen oder deaktivierten App fragt es zusätzlich nach der Aktivierung. **Wurde Daytracker durch das Update auf Nextcloud 35 deaktiviert, diese Aktivierungsfrage mit Ja beantworten.** Während des Vorgangs wird Nextcloud vorübergehend in den Wartungsmodus versetzt.
 
 Alternativ gezielt eine Version installieren:
 
 ```bash
-sudo python3 update-daytracker.py v3.0.3
+sudo python3 update-daytracker.py v3.0.4
 ```
 
 Ohne Versionsangabe wird GitHubs `latest` verwendet. Ist die gewünschte Version bereits installiert, endet das Skript ohne Änderungen. Für eine erneute Installation samt Aktivierung:
@@ -139,7 +139,7 @@ Eine manuelle Erstinstallation ist nicht erforderlich. Das Update-Skript lädt b
 sudo python3 update-daytracker.py --enable
 ```
 
-Ohne `--enable` bleibt die neu installierte App nach der Rückfrage deaktiviert. Version 3.0.3 unterstützt Nextcloud 33 und 34. Die manuelle Alternative über ein Release-Archiv ist weiterhin möglich, erfordert aber dieselben Prüfungen und `occ app:enable`-Schritte.
+Ohne `--enable` bleibt die neu installierte App nach der Rückfrage deaktiviert. Version 3.0.4 unterstützt Nextcloud 33, 34 und 35. Die manuelle Alternative über ein Release-Archiv ist weiterhin möglich, erfordert aber dieselben Prüfungen und `occ app:enable`-Schritte.
 
 ## Datenbankprüfung
 

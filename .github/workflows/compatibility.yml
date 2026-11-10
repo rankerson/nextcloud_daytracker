@@ -1,6 +1,16 @@
 name: Nextcloud compatibility and release
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - appinfo/**
+      - lib/**
+      - js/**
+      - css/**
+      - templates/**
+      - tests/**
+      - .github/workflows/compatibility.yml
   push:
     branches: [main]
     paths:
@@ -23,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        nextcloud: ['33', '34.0.4']
+        nextcloud: ['33', '34.0.4', '35.0.2']
     steps:
       - name: Fetch exact app commit
         env:
@@ -70,12 +80,13 @@ jobs:
           docker exec nextcloud tail -n 100 /var/www/html/data/nextcloud.log || true
 
   release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: smoke
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Fetch tested commit and publish v3.0.3
+      - name: Fetch tested commit and publish v3.0.4
         env:
           COMMIT_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ github.token }}
@@ -84,10 +95,10 @@ jobs:
           git remote add origin https://github.com/rankerson/nextcloud_daytracker.git
           git fetch --depth=1 origin "$COMMIT_SHA"
           git checkout --detach FETCH_HEAD
-          python3 -c 'import xml.etree.ElementTree as E; assert E.parse("appinfo/info.xml").findtext("version") == "3.0.3"'
-          if gh release view v3.0.3 --repo rankerson/nextcloud_daytracker >/dev/null 2>&1; then exit 0; fi
-          git archive --format=tar.gz --prefix=daytracker/ --output=daytracker-3.0.3.tar.gz HEAD appinfo css img js lib templates LICENSE README.md RELEASES.md
-          sha256sum daytracker-3.0.3.tar.gz > daytracker-3.0.3.tar.gz.sha256
-          gh release create v3.0.3 daytracker-3.0.3.tar.gz daytracker-3.0.3.tar.gz.sha256 \
-            --repo rankerson/nextcloud_daytracker --target "$COMMIT_SHA" --title 'Daytracker v3.0.3 – Nextcloud 34' \
-            --notes-file release-notes/3.0.3.md --latest
+          python3 -c 'import xml.etree.ElementTree as E; assert E.parse("appinfo/info.xml").findtext("version") == "3.0.4"'
+          if gh release view v3.0.4 --repo rankerson/nextcloud_daytracker >/dev/null 2>&1; then exit 0; fi
+          git archive --format=tar.gz --prefix=daytracker/ --output=daytracker-3.0.4.tar.gz HEAD appinfo css img js lib templates LICENSE README.md RELEASES.md
+          sha256sum daytracker-3.0.4.tar.gz > daytracker-3.0.4.tar.gz.sha256
+          gh release create v3.0.4 daytracker-3.0.4.tar.gz daytracker-3.0.4.tar.gz.sha256 \
+            --repo rankerson/nextcloud_daytracker --target "$COMMIT_SHA" --title 'Daytracker v3.0.4 – Nextcloud 35' \
+            --notes-file release-notes/3.0.4.md --latest
