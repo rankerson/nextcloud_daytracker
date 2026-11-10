@@ -140,7 +140,8 @@ class UpdaterTests(unittest.TestCase):
         import xml.etree.ElementTree as ET
         dep = ET.fromstring('<nextcloud min-version="33" max-version="999"/>')
         self.assertTrue(u.compatible("34.0.4", dep))
-        self.assertTrue(u.compatible("35.0.2", dep))\n        self.assertFalse(u.compatible("36.0.0", dep))
+        self.assertTrue(u.compatible("35.0.2", dep))
+        self.assertFalse(u.compatible("36.0.0", dep))
         self.assertFalse(u.compatible("32.0.9", dep))
         self.assertGreater(u.version_tuple("3.0.10"), u.version_tuple("3.0.9"))
         for value in ("3.0.4;id", "../3.0.4", "3.0.4-rc1", "03.0.4"):
