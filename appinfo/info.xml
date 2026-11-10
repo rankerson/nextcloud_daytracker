@@ -20,7 +20,7 @@ Die App unterstützt:
 - CSV-Export
 - strikte Benutzertrennung
     ]]></description>
-    <version>3.0.3</version>
+    <version>3.0.4</version>
     <licence>AGPL-3.0-or-later</licence>
     <author>Sascha Rankers</author>
     <namespace>Daytracker</namespace>
@@ -29,7 +29,7 @@ Die App unterstützt:
     <dependencies>
         <php min-version="8.2"/>
         <database>pgsql</database>
-        <nextcloud min-version="33" max-version="34"/>
+        <nextcloud min-version="33" max-version="999"/>
     </dependencies>
 
     <navigations>
