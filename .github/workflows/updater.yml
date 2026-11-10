@@ -1,6 +1,12 @@
 name: Test AIO updater
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - update-daytracker.py
+      - scripts/tests/**
+      - .github/workflows/updater.yml
   push:
     branches: [main]
     paths:
