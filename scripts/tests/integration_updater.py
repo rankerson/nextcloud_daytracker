@@ -32,7 +32,7 @@ def data():
 def main():
     command = ["sudo", "python3", "update-daytracker.py", "--container", "nextcloud", "--database-container", "db",
                "--backup-dir", "/var/backups/daytracker-ci"]
-    requested = ["v3.0.4"] if os.environ["NC_VERSION"] == "33" else []
+    requested = ["v3.0.3"]
     before = occ("config:app:get", "daytracker", "installed_version")
     assert before == "3.0.2"
     assert data() == "Daten bleiben erhalten"
@@ -43,7 +43,7 @@ def main():
     run(*command, *requested, ok=False)
     assert occ("config:app:get", "daytracker", "installed_version") == before
     run(*command, *requested, "--yes", "--enable")
-    assert occ("config:app:get", "daytracker", "installed_version") == "3.0.4"
+    assert occ("config:app:get", "daytracker", "installed_version") == "3.0.3"
     assert occ("config:app:get", "daytracker", "enabled") == "yes"
     assert not status()["maintenance"] and not status()["needsDbUpgrade"]
     assert data() == "Daten bleiben erhalten"
@@ -68,7 +68,7 @@ def main():
     run(*command, "v3.0.0", "--yes", ok=False)
     # Reinstall a disabled app: retain its disabled state unless --enable was requested.
     occ("app:disable", "daytracker")
-    run(*command, "v3.0.4", "--yes", "--reinstall", "--full-db-backup")
+    run(*command, "v3.0.3", "--yes", "--reinstall", "--full-db-backup")
     assert occ("config:app:get", "daytracker", "enabled") == "no"
     assert data() == "Daten bleiben erhalten" and not status()["maintenance"]
     full = run("sudo", "find", "/var/backups/daytracker-ci", "-name", "database.dump").strip()
@@ -111,7 +111,7 @@ def main():
         'chown -R www-data:www-data /var/www/html/custom_apps/daytracker', "sh", stage)
     run("docker", "restart", "nextcloud")
     occ("maintenance:mode", "--off")
-    assert occ("config:app:get", "daytracker", "installed_version") == "3.0.4"
+    assert occ("config:app:get", "daytracker", "installed_version") == "3.0.3"
     assert occ("config:app:get", "daytracker", "enabled") == "no"
     run("docker", "exec", "nextcloud", "test", "!", "-e", "/var/www/html/custom_apps/daytracker/rollback-test.txt")
     print("PASS: updates, scoped/full backups and scoped rollback preserving other apps, app state, schema, data and sequences")
