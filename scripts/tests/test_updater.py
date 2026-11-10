@@ -17,7 +17,7 @@ spec.loader.exec_module(u)
 
 
 def archive(path, extra=None):
-    info = b'<info><id>daytracker</id><version>3.0.4</version><dependencies><php min-version="8.2"/><nextcloud min-version="33" max-version="35"/><database>pgsql</database></dependencies></info>'
+    info = b'<info><id>daytracker</id><version>3.0.4</version><dependencies><php min-version="8.2"/><nextcloud min-version="33" max-version="999"/><database>pgsql</database></dependencies></info>'
     with tarfile.open(path, "w:gz") as tar:
         for name, data in {"daytracker/appinfo/info.xml": info, "daytracker/appinfo/routes.php": b"<?php",
                            "daytracker/lib/AppInfo/Application.php": b"<?php", "daytracker/templates/main.php": b"<?php"}.items():
