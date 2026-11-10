@@ -189,7 +189,7 @@ class UpdaterTests(unittest.TestCase):
                     self.assertTrue((app / "appinfo/info.xml").exists())
 
     def test_checksum_and_incompatible_server_rejected(self):
-        for bad_checksum, server in ((True, "34.0.4"), (False, "35.0.0")):
+        for bad_checksum, server in ((True, "34.0.4"), (False, "32.0.9")):
             with self.subTest(checksum=bad_checksum), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
                 with patch.object(u, "download", self.release_fixture(root, checksum_bad=bad_checksum)):
